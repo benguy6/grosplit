@@ -1,0 +1,389 @@
+/* GroSplit — design tokens and receipt primitives.
+   Values lifted from the handoff and GroSplit App.dc.html, which is literal.
+
+   The one rule everything else serves: facts are paper (square corners, torn
+   edges, dotted leaders, mono money), actions are app chrome (12-14px radii,
+   Space Grotesk). One texture for facts, one for actions. */
+
+:root {
+  --paper: #EFEBE3;
+  --card: #FFFDF8;
+  --ink: #1C1A17;
+  --ink-60: #5C574F;
+  --ink-40: #9A9389;
+  --ink-25: #B5AEA2;
+  /* Accessibility fix on the handoff: ink-25 on card is ~2:1, and the split
+     screen uses it for a line carrying real money. Informational meta uses
+     this instead; ink-25 is kept for decoration only. */
+  --ink-meta: #78716A;
+
+  --accent: #E8552D;
+  --accent-hover: #C4401C;
+  --accent-disabled: #F1C3B2;
+  --accent-soft: #FDEBE4;
+  --accent-deep: #8F3418;
+
+  --sage: #3B7A57;
+  --sage-hover: #2F6246;
+  --sage-muted: #C4CFC6;
+  --sage-soft: #E7F1EA;
+
+  --amber: #D9A400;
+  --amber-soft: #FDF3D6;
+  --amber-border: #E8CE7A;
+  --amber-text: #8A6A00;
+  --amber-text-deep: #6E5500;
+
+  --danger: #B03A1B;
+  --danger-hover: #963014;
+  --danger-border: #E7C3B5;
+
+  --line: #E3DDD2;
+  --line-soft: #F2EEE6;
+  --dash: #C9C1B4;
+  --dot: #D5CEC2;
+  --fill-hover: #F4F0E8;
+  --fill-hover-paper: #E4DFD5;
+
+  --ui: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  /* Money and receipt lines. Never Space Grotesk. */
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --gutter: 20px;
+  --ease: cubic-bezier(.32, .72, 0, 1);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--ui);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+button { font: inherit; color: inherit; border: none; background: none; cursor: pointer; }
+input { font: inherit; color: inherit; }
+
+#app {
+  position: relative;
+  min-height: 100dvh;
+  max-width: 520px;
+  margin: 0 auto;
+  overflow-x: hidden;
+}
+
+.screen { display: flex; flex-direction: column; min-height: 100dvh; }
+
+/* ── type ──────────────────────────────────────────────────────────────── */
+
+.display { font: 700 30px/1.1 var(--ui); letter-spacing: -0.025em; }
+.title   { font: 600 18px var(--ui); letter-spacing: -0.01em; }
+.body    { font: 400 15px/1.5 var(--ui); color: var(--ink-60); text-wrap: pretty; }
+.label   { font: 500 12px var(--ui); color: var(--ink-60); }
+
+.meta {
+  font: 400 11px var(--mono);
+  letter-spacing: .06em;
+  color: var(--ink-40);
+  text-transform: uppercase;
+}
+
+/* Every currency figure. tabular-nums so decimals align down a column. */
+.money { font: 500 16px var(--mono); font-variant-numeric: tabular-nums; }
+.money-lg { font: 700 26px var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.money-hero { font: 700 40px/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -0.04em; }
+
+/* ── receipt paper ─────────────────────────────────────────────────────── */
+
+/* Torn top and bottom edges, 14px teeth 9px tall. Radius 0, always. */
+.receipt { position: relative; background: var(--card); border-radius: 0; }
+.receipt::before,
+.receipt::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  height: 9px;
+}
+.receipt::before {
+  top: -9px;
+  background:
+    linear-gradient(-45deg, var(--card) 7px, transparent 0) 0 100% / 14px 14px repeat-x,
+    linear-gradient(45deg, var(--card) 7px, transparent 0) 0 100% / 14px 14px repeat-x;
+}
+.receipt::after {
+  bottom: -9px;
+  background:
+    linear-gradient(-45deg, transparent 7px, var(--card) 0) 0 0 / 14px 14px repeat-x,
+    linear-gradient(45deg, transparent 7px, var(--card) 0) 0 0 / 14px 14px repeat-x;
+}
+.receipt-wrap { padding: 9px 0; filter: drop-shadow(0 1px 2px rgba(28, 26, 23, .07)); }
+
+.store-name {
+  font: 700 15px var(--mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* Dotted leader running from label to right-aligned price. */
+.leader { display: flex; align-items: baseline; gap: 6px; font: 400 11.5px var(--mono); color: var(--ink-60); }
+.leader-fill { flex: 1; border-bottom: 1px dotted var(--dot); }
+
+.rule-dashed { border-top: 1px dashed var(--dot); }
+.rule-double { border-bottom: 3px double var(--dash); }
+
+/* Every total sits between a dashed rule above and a double rule below. */
+.total-block {
+  border-top: 1px dashed var(--dot);
+  border-bottom: 3px double var(--dash);
+  padding: 10px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+/* ── chrome ────────────────────────────────────────────────────────────── */
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+.divider { height: 1px; background: var(--line-soft); }
+
+.btn {
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  font: 600 16px var(--ui);
+  width: 100%;
+  transition: background .12s ease, transform .12s ease;
+}
+.btn:active { transform: scale(.985); }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary[disabled] { background: var(--accent-disabled); cursor: default; }
+.btn-primary[disabled]:active { transform: none; }
+.btn-sage { background: var(--sage); color: #fff; }
+.btn-sage:hover { background: var(--sage-hover); }
+.btn-muted { background: var(--sage-muted); color: #fff; cursor: default; }
+.btn-ink { background: var(--ink); color: #fff; }
+.btn-quiet { height: 44px; color: var(--ink-60); font: 500 14px var(--ui); border-radius: 14px; }
+.btn-quiet:hover { background: var(--fill-hover-paper); }
+.btn-outline { background: var(--card); border: 1.5px solid var(--ink); height: 46px; border-radius: 13px; font: 600 14px var(--ui); }
+.btn-fill { background: var(--paper); border: 1px solid var(--line); height: 46px; border-radius: 13px; font: 600 14px var(--ui); color: var(--ink-60); }
+
+.pill {
+  padding: 9px 13px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  font: 500 12.5px var(--ui);
+  cursor: pointer;
+}
+.pill:hover { background: var(--fill-hover); }
+.pill.on { background: var(--accent-soft); border-color: var(--accent); }
+
+.back {
+  width: 34px; height: 34px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+  font: 400 16px var(--ui);
+  flex: none;
+}
+
+.avatar {
+  border-radius: 999px;
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600;
+  flex: none;
+}
+
+.field {
+  height: 50px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  padding: 0 14px;
+  width: 100%;
+  font: 500 15px var(--ui);
+  outline: none;
+}
+.field:focus {
+  border: 1.5px solid var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.toggle {
+  width: 46px; height: 28px;
+  border-radius: 999px;
+  background: #DDD6CA;
+  padding: 3px;
+  display: flex;
+  justify-content: flex-start;
+  flex: none;
+  transition: background .15s ease;
+}
+.toggle.on { background: var(--sage); justify-content: flex-end; }
+.toggle span { width: 22px; height: 22px; border-radius: 999px; background: #fff; display: block; }
+
+/* Item row — the workhorse. The left edge carries status. */
+.item-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  width: 100%;
+  text-align: left;
+  animation: gsIn .28s ease both;
+}
+.item-row.flagged { border-color: var(--amber-border); border-left-color: var(--amber); }
+.item-row.picked { background: var(--accent-soft); border-color: var(--accent); border-left-color: var(--accent); }
+.item-row:active { transform: scale(.98); }
+
+.box {
+  width: 26px; height: 26px;
+  border-radius: 8px;
+  flex: none;
+  display: flex; align-items: center; justify-content: center;
+  font: 700 13px var(--ui);
+  background: var(--accent);
+  color: #fff;
+  border: 1.5px solid var(--accent);
+}
+.box.amber { background: var(--amber-soft); color: var(--amber-text); border-color: var(--amber-border); }
+.box.empty { background: transparent; border-color: #DDD6CA; }
+
+.banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 13px;
+  border-radius: 12px;
+  background: var(--amber-soft);
+  border: 1px solid var(--amber-border);
+  font: 500 13px var(--ui);
+  color: var(--amber-text-deep);
+}
+
+/* Flow strip — this is navigation, not decoration. */
+.flow { display: flex; align-items: center; gap: 5px; }
+.flow button { flex: 1; display: flex; flex-direction: column; gap: 4px; padding-bottom: 2px; }
+.flow button:hover { opacity: .65; }
+.flow .bar { height: 3px; background: #DDD6CA; }
+.flow .step { font: 500 8.5px var(--mono); letter-spacing: .06em; color: var(--ink-25); text-transform: uppercase; }
+.flow .now .bar { background: var(--accent); }
+.flow .now .step { color: var(--accent); }
+.flow .done .bar { background: var(--ink); }
+.flow .done .step { color: var(--ink-60); }
+
+.sticky-head {
+  position: sticky; top: 0; z-index: 4;
+  background: var(--paper);
+  padding: max(20px, env(safe-area-inset-top)) var(--gutter) 10px;
+  border-bottom: 1px solid var(--line);
+}
+.sticky-foot {
+  position: sticky; bottom: 0;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+  padding: 12px var(--gutter) calc(18px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 9px;
+}
+.grow { flex: 1; min-height: 24px; }
+
+/* Tab bar — only on the two roots. No accent, so the FAB stays loudest. */
+.tabbar {
+  position: sticky; bottom: 0;
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  padding: 10px 30px calc(18px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; justify-content: space-between;
+}
+.tab { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 64px; }
+.tab .glyph { width: 20px; height: 20px; border: 2px solid var(--ink-40); }
+.tab .name { font: 500 10.5px var(--ui); color: var(--ink-40); }
+.tab.on .glyph { border-color: var(--ink); }
+.tab.on .name { color: var(--ink); }
+.fab {
+  width: 56px; height: 56px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font: 400 30px var(--ui);
+  box-shadow: 0 4px 14px rgba(232, 85, 45, .32);
+  margin-top: -26px;
+}
+.fab:hover { background: var(--accent-hover); }
+
+/* ── overlays ──────────────────────────────────────────────────────────── */
+
+.scrim {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(28, 26, 23, .38);
+  display: flex; align-items: flex-end;
+  animation: gsFade .18s ease both;
+}
+.sheet {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--paper);
+  border-radius: 22px 22px 0 0;
+  padding: 18px var(--gutter) calc(28px + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 30px rgba(28, 26, 23, .18);
+  animation: gsUp .34s var(--ease) both;
+  max-height: 92dvh;
+  overflow-y: auto;
+}
+.grab { width: 38px; height: 4px; border-radius: 999px; background: var(--dot); margin: 0 auto 12px; }
+
+/* The new-receipt sheet is paper, not chrome — torn edge, square corners. */
+.sheet.paper {
+  background: var(--card);
+  border-radius: 0;
+  padding: 16px 22px calc(28px + env(safe-area-inset-bottom));
+}
+.sheet-teeth {
+  height: 11px;
+  background:
+    linear-gradient(-45deg, transparent 8px, var(--card) 0) 0 0 / 16px 16px repeat-x,
+    linear-gradient(45deg, transparent 8px, var(--card) 0) 0 0 / 16px 16px repeat-x;
+}
+
+.toast {
+  position: fixed;
+  left: var(--gutter); right: var(--gutter);
+  bottom: calc(104px + env(safe-area-inset-bottom));
+  z-index: 95;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex; align-items: center; gap: 11px;
+  padding: 13px 16px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--card);
+  font: 500 14px var(--ui);
+  box-shadow: 0 8px 24px rgba(28, 26, 23, .22);
+  animation: gsIn .22s ease both;
+}
+.toast .check { color: #7FC49B; font-weight: 700; }
+
+/* ── motion. Nothing loops, nothing pulses. ────────────────────────────── */
+
+@keyframes gsIn   { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes gsUp   { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes gsFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gsScan { 0% { top: 6%; } 100% { top: 88%; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

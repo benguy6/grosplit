@@ -1,0 +1,8 @@
+# Only the app goes into the image: package.json, the root *.js modules, public/.
+# Keeps .env, .env.production, databases, tests and scratch files out of the build.
+*
+!package.json
+!*.js
+!public/
+*.test.js
+.*.js

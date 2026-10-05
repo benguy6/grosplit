@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EFEBE3;font-family:'Space Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#E8552D;text-decoration:none}a:hover{color:#C4401C}
+</style>
+</helmet>
+
+<div style="max-width:1180px;margin:0 auto;padding:56px 40px 88px;color:#1C1A17">
+
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:32px;padding-bottom:28px;border-bottom:2px solid #1C1A17">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:34px;height:34px;border-radius:11px;background:#E8552D;display:flex;align-items:center;justify-content:center;color:#fff;font:700 17px 'Space Grotesk',sans-serif">G</div>
+        <div style="font:700 34px/1 'Space Grotesk',sans-serif;letter-spacing:-0.02em">GroSplit</div>
+      </div>
+      <div style="font:400 16px/1.5 'Space Grotesk',sans-serif;color:#5C574F;max-width:640px;text-wrap:pretty">Design system for the grocery-split calculator. The app <em>is</em> a receipt: thermal-paper surfaces, torn edges, dotted leader lines, monospaced money, double rules under every total — with one loud accent for the moment that matters.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;text-align:right;font:500 11px/1.6 'JetBrains Mono',monospace;color:#9A9389;white-space:nowrap">
+      <div>V 0.1 · DRAFT</div>
+      <div>PLATFORM / iOS</div>
+      <div>CURRENCY / USD</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin:28px 0 0">
+    <div style="padding:7px 13px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;font:500 12px 'JetBrains Mono',monospace;color:#5C574F">6 housemates</div>
+    <div style="padding:7px 13px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;font:500 12px 'JetBrains Mono',monospace;color:#5C574F">Shared-by-default items</div>
+    <div style="padding:7px 13px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;font:500 12px 'JetBrains Mono',monospace;color:#5C574F">Telegram poll opt-out</div>
+    <div style="padding:7px 13px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;font:500 12px 'JetBrains Mono',monospace;color:#5C574F">Exports to Tricount</div>
+  </div>
+
+  <!-- ── 01 COLOR ─────────────────────────────── -->
+  <div style="display:flex;align-items:baseline;gap:14px;margin:64px 0 22px">
+    <div style="font:500 12px 'JetBrains Mono',monospace;color:#E8552D">01</div>
+    <div style="font:600 22px/1 'Space Grotesk',sans-serif;letter-spacing:-0.01em">Color</div>
+    <div style="flex:1;height:1px;background:#DDD6CA"></div>
+    <div style="font:400 13px 'Space Grotesk',sans-serif;color:#9A9389">Paper first. Accent is a scarce resource.</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px">
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;overflow:hidden">
+      <div style="height:78px;background:#EFEBE3"></div>
+      <div style="padding:11px 13px;display:flex;flex-direction:column;gap:3px"><div style="font:600 13px 'Space Grotesk',sans-serif">Paper</div><div style="font:400 11px 'JetBrains Mono',monospace;color:#9A9389">#EFEBE3 · app bg</div></div>
+    </div>
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;overflow:hidden">
+      <div style="height:78px;background:#FFFDF8;border-bottom:1px solid #E3DDD2"></div>
+      <div style="padding:11px 13px;display:flex;flex-direction:column;gap:3px"><div style="font:600 13px 'Space Grotesk',sans-serif">Card</div><div style="font:400 11px 'JetBrains Mono',monospace;color:#9A9389">#FFFDF8 · surfaces</div></div>
+    </div>
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;overflow:hidden">
+      <div style="height:78px;background:#1C1A17"></div>
+      <div style="padding:11px 13px;display:flex;flex-direction:column;gap:3px"><div style="font:600 13px 'Space Grotesk',sans-serif">Ink</div><div style="font:400 11px 'JetBrains Mono',monospace;color:#9A9389">#1C1A17 · primary text</div></div>
+    </div>
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;overflow:hidden">
+      <div style="height:78px;background:#5C574F"></div>
+      <div style="padding:11px 13px;display:flex;flex-direction:column;gap:3px"><div style="font:600 13px 'Space Grotesk',sans-serif">Ink 60</div><div style="font:400 11px 'JetBrains Mono',monospace;color:#9A9389">#5C574F · secondary</div></div>
+    </div>
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;overflow:hidden">
+      <div style="height:78px;background:#9A9389"></div>
+      <div style="padding:11px 13px;display:flex;flex-direction:column;gap:3px"><div style="font:600 13px 'Space Grotesk',sans-serif">Ink 40</div><div style="font:400 11px 'JetBrains Mono',monospace;color:#9A9389">#9A9389 · meta, hints</div></div>
+    </div>
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;overflow:hidden">
+      <div style="height:78px;background:#E8552D"></div>
+      <div style="padding:11px 13px;display:flex;flex-direction:column;gap:3px"><div style="font:600 13px 'Space Grotesk',sans-serif">Accent</div><div style="font:400 11px 'JetBrains Mono',monospace;color:#9A9389">#E8552D · one per screen</div></div>
+    </div>
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;overflow:hidden">
+      <div style="height:78px;background:#FDEBE4"></div>
+      <div style="padding:11px 13px;display:flex;flex-direction:column;gap:3px"><div style="font:600 13px 'Space Grotesk',sans-serif">Accent soft</div><div style="font:400 11px 'JetBrains Mono',monospace;color:#9A9389">#FDEBE4 · selected rows</div></div>
+    </div>
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;overflow:hidden">
+      <div style="height:78px;background:#3B7A57"></div>
+      <div style="padding:11px 13px;display:flex;flex-direction:column;gap:3px"><div style="font:600 13px 'Space Grotesk',sans-serif">Sage</div><div style="font:400 11px 'JetBrains Mono',monospace;color:#9A9389">#3B7A57 · confirmed, in</div></div>
+    </div>
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;overflow:hidden">
+      <div style="height:78px;background:#D9A400"></div>
+      <div style="padding:11px 13px;display:flex;flex-direction:column;gap:3px"><div style="font:600 13px 'Space Grotesk',sans-serif">Amber</div><div style="font:400 11px 'JetBrains Mono',monospace;color:#9A9389">#D9A400 · needs review</div></div>
+    </div>
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;overflow:hidden">
+      <div style="height:78px;background:#E3DDD2"></div>
+      <div style="padding:11px 13px;display:flex;flex-direction:column;gap:3px"><div style="font:600 13px 'Space Grotesk',sans-serif">Line</div><div style="font:400 11px 'JetBrains Mono',monospace;color:#9A9389">#E3DDD2 · hairlines</div></div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;padding:15px 18px;background:#FDEBE4;border:1px dashed #E8552D;border-radius:12px;font:400 13px/1.55 'Space Grotesk',sans-serif;color:#8F3418;text-wrap:pretty"><strong style="font-weight:600">Accent rule:</strong> one accent element per screen — the primary action, or the number the user came for. Never both. Opt-out state uses ink 40 + strikethrough, not red.</div>
+
+  <!-- ── 02 TYPE ─────────────────────────────── -->
+  <div style="display:flex;align-items:baseline;gap:14px;margin:64px 0 22px">
+    <div style="font:500 12px 'JetBrains Mono',monospace;color:#E8552D">02</div>
+    <div style="font:600 22px/1 'Space Grotesk',sans-serif;letter-spacing:-0.01em">Typography</div>
+    <div style="flex:1;height:1px;background:#DDD6CA"></div>
+    <div style="font:400 13px 'Space Grotesk',sans-serif;color:#9A9389">Space Grotesk for voice · JetBrains Mono for money</div>
+  </div>
+
+  <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:8px 22px">
+    <div style="display:flex;align-items:baseline;gap:24px;padding:18px 0;border-bottom:1px solid #EFEBE3">
+      <div style="width:150px;flex:none;font:500 11px/1.5 'JetBrains Mono',monospace;color:#9A9389">display / 34 · 700<br>-2% tracking</div>
+      <div style="font:700 34px/1.1 'Space Grotesk',sans-serif;letter-spacing:-0.02em">$142.60 at Trader Joe's</div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:24px;padding:18px 0;border-bottom:1px solid #EFEBE3">
+      <div style="width:150px;flex:none;font:500 11px/1.5 'JetBrains Mono',monospace;color:#9A9389">title / 22 · 600</div>
+      <div style="font:600 22px/1.2 'Space Grotesk',sans-serif;letter-spacing:-0.01em">Review 18 items</div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:24px;padding:18px 0;border-bottom:1px solid #EFEBE3">
+      <div style="width:150px;flex:none;font:500 11px/1.5 'JetBrains Mono',monospace;color:#9A9389">body / 16 · 400</div>
+      <div style="font:400 16px/1.5 'Space Grotesk',sans-serif">Everyone's in on everything until the poll says otherwise.</div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:24px;padding:18px 0;border-bottom:1px solid #EFEBE3">
+      <div style="width:150px;flex:none;font:500 11px/1.5 'JetBrains Mono',monospace;color:#9A9389">label / 13 · 500</div>
+      <div style="font:500 13px/1.4 'Space Grotesk',sans-serif">Split between</div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:24px;padding:18px 0;border-bottom:1px solid #EFEBE3">
+      <div style="width:150px;flex:none;font:500 11px/1.5 'JetBrains Mono',monospace;color:#9A9389">money / mono<br>tabular-nums</div>
+      <div style="font:500 20px/1.2 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">$23.77 · $8.40 · $112.05</div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:24px;padding:18px 0">
+      <div style="width:150px;flex:none;font:500 11px/1.5 'JetBrains Mono',monospace;color:#9A9389">meta / mono 11<br>uppercase</div>
+      <div style="font:500 11px/1.4 'JetBrains Mono',monospace;letter-spacing:0.06em;color:#9A9389">POLL CLOSES IN 4H · 3 OF 6 VOTED</div>
+    </div>
+  </div>
+
+  <div style="margin-top:14px;font:400 13px/1.55 'Space Grotesk',sans-serif;color:#5C574F;text-wrap:pretty">Every currency figure is mono with <code style="font:500 12px 'JetBrains Mono',monospace;background:#FFFDF8;border:1px solid #E3DDD2;padding:1px 5px;border-radius:5px">tabular-nums</code> so columns of prices line up on the decimal. Never set money in Space Grotesk.</div>
+
+  <!-- ── 03 SPACE ─────────────────────────────── -->
+  <div style="display:flex;align-items:baseline;gap:14px;margin:64px 0 22px">
+    <div style="font:500 12px 'JetBrains Mono',monospace;color:#E8552D">03</div>
+    <div style="font:600 22px/1 'Space Grotesk',sans-serif;letter-spacing:-0.01em">Spacing &amp; radius</div>
+    <div style="flex:1;height:1px;background:#DDD6CA"></div>
+    <div style="font:400 13px 'Space Grotesk',sans-serif;color:#9A9389">4pt base · generous rounding</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:18px">
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:14px">
+      <div style="font:600 14px 'Space Grotesk',sans-serif">Spacing scale</div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:center;gap:14px"><div style="width:58px;font:500 11px 'JetBrains Mono',monospace;color:#9A9389">4 · xs</div><div style="height:14px;width:4px;background:#E8552D;border-radius:2px"></div></div>
+        <div style="display:flex;align-items:center;gap:14px"><div style="width:58px;font:500 11px 'JetBrains Mono',monospace;color:#9A9389">8 · sm</div><div style="height:14px;width:8px;background:#E8552D;border-radius:2px"></div></div>
+        <div style="display:flex;align-items:center;gap:14px"><div style="width:58px;font:500 11px 'JetBrains Mono',monospace;color:#9A9389">12 · md</div><div style="height:14px;width:12px;background:#E8552D;border-radius:2px"></div></div>
+        <div style="display:flex;align-items:center;gap:14px"><div style="width:58px;font:500 11px 'JetBrains Mono',monospace;color:#9A9389">16 · lg</div><div style="height:14px;width:16px;background:#E8552D;border-radius:2px"></div></div>
+        <div style="display:flex;align-items:center;gap:14px"><div style="width:58px;font:500 11px 'JetBrains Mono',monospace;color:#9A9389">24 · xl</div><div style="height:14px;width:24px;background:#E8552D;border-radius:2px"></div></div>
+        <div style="display:flex;align-items:center;gap:14px"><div style="width:58px;font:500 11px 'JetBrains Mono',monospace;color:#9A9389">32 · 2xl</div><div style="height:14px;width:32px;background:#E8552D;border-radius:2px"></div></div>
+      </div>
+      <div style="font:400 12.5px/1.5 'Space Grotesk',sans-serif;color:#5C574F">Screen gutter 20 · card padding 18 · list row height 60 · gap between stacked cards 12.</div>
+    </div>
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:14px">
+      <div style="font:600 14px 'Space Grotesk',sans-serif">Rules &amp; edges</div>
+      <div style="display:flex;flex-direction:column;gap:11px">
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:96px;border-top:1px dashed #C9C1B4"></div><div style="font:500 10.5px 'JetBrains Mono',monospace;color:#9A9389">DASHED · section break</div></div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:96px;border-top:1px dotted #D5CEC2"></div><div style="font:500 10.5px 'JetBrains Mono',monospace;color:#9A9389">DOTTED · leader line</div></div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:96px;border-top:3px double #C9C1B4"></div><div style="font:500 10.5px 'JetBrains Mono',monospace;color:#9A9389">DOUBLE · under a total</div></div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:96px;height:9px;background:linear-gradient(-45deg,transparent 7px,#FFFDF8 0) 0 0/14px 14px repeat-x,linear-gradient(45deg,transparent 7px,#FFFDF8 0) 0 0/14px 14px repeat-x"></div><div style="font:500 10.5px 'JetBrains Mono',monospace;color:#9A9389">TORN · paper edge, 14px teeth</div></div>
+      </div>
+      <div style="font:400 12.5px/1.5 'Space Grotesk',sans-serif;color:#5C574F">Receipt surfaces are square — radius 0, torn top and bottom. Only interactive chrome rounds: 12–14 buttons and inputs, 999 for chips and avatars. Shadow stays near-absent: <code style="font:500 12px 'JetBrains Mono',monospace">0 1px 2px rgba(28,26,23,.05)</code>.</div>
+    </div>
+  </div>
+
+  <!-- ── 04 BUTTONS ─────────────────────────────── -->
+  <div style="display:flex;align-items:baseline;gap:14px;margin:64px 0 22px">
+    <div style="font:500 12px 'JetBrains Mono',monospace;color:#E8552D">04</div>
+    <div style="font:600 22px/1 'Space Grotesk',sans-serif;letter-spacing:-0.01em">Buttons</div>
+    <div style="flex:1;height:1px;background:#DDD6CA"></div>
+    <div style="font:400 13px 'Space Grotesk',sans-serif;color:#9A9389">Min height 50 on primary · 44 hit target everywhere</div>
+  </div>
+
+  <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:26px;display:flex;gap:34px;flex-wrap:wrap;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:11px;min-width:190px">
+      <div style="font:500 11px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389">PRIMARY</div>
+      <div style="height:50px;border-radius:14px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;font:600 16px 'Space Grotesk',sans-serif;cursor:pointer;transition:transform .12s ease,background .12s ease" style-hover="background:#C4401C" style-active="transform:scale(0.98)">Send poll to Telegram</div>
+      <div style="height:50px;border-radius:14px;background:#F1C3B2;color:#fff;display:flex;align-items:center;justify-content:center;font:600 16px 'Space Grotesk',sans-serif">Disabled</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:11px;min-width:190px">
+      <div style="font:500 11px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389">SECONDARY</div>
+      <div style="height:50px;border-radius:14px;background:#FFFDF8;border:1.5px solid #1C1A17;color:#1C1A17;display:flex;align-items:center;justify-content:center;font:600 16px 'Space Grotesk',sans-serif;cursor:pointer" style-hover="background:#EFEBE3">Add item manually</div>
+      <div style="height:50px;border-radius:14px;background:#EFEBE3;color:#5C574F;display:flex;align-items:center;justify-content:center;font:600 16px 'Space Grotesk',sans-serif;cursor:pointer" style-hover="background:#E7E2D8">Tertiary / fill</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:11px;min-width:190px">
+      <div style="font:500 11px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389">CONFIRM &amp; DESTRUCTIVE</div>
+      <div style="height:50px;border-radius:14px;background:#3B7A57;color:#fff;display:flex;align-items:center;justify-content:center;gap:8px;font:600 16px 'Space Grotesk',sans-serif;cursor:pointer" style-hover="background:#2F6246"><span style="font:700 15px 'Space Grotesk',sans-serif">✓</span>Confirm &amp; lock split</div>
+      <div style="height:50px;border-radius:14px;background:transparent;color:#B03A1B;display:flex;align-items:center;justify-content:center;font:600 16px 'Space Grotesk',sans-serif;cursor:pointer" style-hover="background:#FDEBE4">Delete receipt</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="font:500 11px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389">SMALL &amp; ICON</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div style="height:34px;padding:0 14px;border-radius:999px;background:#1C1A17;color:#fff;display:flex;align-items:center;font:500 13px 'Space Grotesk',sans-serif;cursor:pointer">Copy $23.77</div>
+        <div style="height:34px;padding:0 14px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;color:#1C1A17;display:flex;align-items:center;font:500 13px 'Space Grotesk',sans-serif;cursor:pointer">Edit</div>
+        <div style="width:38px;height:38px;border-radius:999px;background:#EFEBE3;display:flex;align-items:center;justify-content:center;font:500 19px 'Space Grotesk',sans-serif;color:#1C1A17;cursor:pointer">+</div>
+      </div>
+      <div style="font:400 12.5px/1.5 'Space Grotesk',sans-serif;color:#5C574F;max-width:250px">Primary buttons are full-width and pinned above the tab bar with a 16px paper gradient behind them.</div>
+    </div>
+  </div>
+
+  <!-- ── 05 INPUTS ─────────────────────────────── -->
+  <div style="display:flex;align-items:baseline;gap:14px;margin:64px 0 22px">
+    <div style="font:500 12px 'JetBrains Mono',monospace;color:#E8552D">05</div>
+    <div style="font:600 22px/1 'Space Grotesk',sans-serif;letter-spacing:-0.01em">Inputs</div>
+    <div style="flex:1;height:1px;background:#DDD6CA"></div>
+    <div style="font:400 13px 'Space Grotesk',sans-serif;color:#9A9389">Price fields are always mono &amp; right-aligned</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px">
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="font:500 12px 'Space Grotesk',sans-serif;color:#5C574F">Item name</div>
+        <div style="height:48px;border-radius:12px;border:1px solid #E3DDD2;background:#EFEBE3;display:flex;align-items:center;padding:0 14px;font:400 15px 'Space Grotesk',sans-serif;color:#9A9389">e.g. Oat milk 1L</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="font:500 12px 'Space Grotesk',sans-serif;color:#5C574F">Focused</div>
+        <div style="height:48px;border-radius:12px;border:1.5px solid #E8552D;background:#FFFDF8;box-shadow:0 0 0 4px #FDEBE4;display:flex;align-items:center;padding:0 14px;font:400 15px 'Space Grotesk',sans-serif;color:#1C1A17">Oat milk 1L<span style="width:1.5px;height:20px;background:#E8552D;margin-left:2px"></span></div>
+      </div>
+    </div>
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="font:500 12px 'Space Grotesk',sans-serif;color:#5C574F">Price</div>
+        <div style="height:48px;border-radius:12px;border:1px solid #E3DDD2;background:#FFFDF8;display:flex;align-items:center;justify-content:space-between;padding:0 14px"><span style="font:500 15px 'JetBrains Mono',monospace;color:#9A9389">$</span><span style="font:500 17px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">4.29</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="font:500 12px 'Space Grotesk',sans-serif;color:#B03A1B">Error</div>
+        <div style="height:48px;border-radius:12px;border:1.5px solid #B03A1B;background:#FFFDF8;display:flex;align-items:center;justify-content:space-between;padding:0 14px"><span style="font:500 15px 'JetBrains Mono',monospace;color:#9A9389">$</span><span style="font:500 17px 'JetBrains Mono',monospace">—</span></div>
+        <div style="font:400 12px 'Space Grotesk',sans-serif;color:#B03A1B">Add a price so the split adds up.</div>
+      </div>
+    </div>
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="font:500 12px 'Space Grotesk',sans-serif;color:#5C574F">Segmented</div>
+        <div style="height:42px;border-radius:12px;background:#EFEBE3;padding:4px;display:flex;gap:4px">
+          <div style="flex:1;border-radius:9px;background:#FFFDF8;box-shadow:0 1px 2px rgba(28,26,23,.06);display:flex;align-items:center;justify-content:center;font:500 13px 'Space Grotesk',sans-serif">Scan</div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;font:500 13px 'Space Grotesk',sans-serif;color:#5C574F">Manual</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="font:500 12px 'Space Grotesk',sans-serif;color:#5C574F">Toggle &amp; checkbox</div>
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="width:50px;height:30px;border-radius:999px;background:#3B7A57;padding:3px;display:flex;justify-content:flex-end"><div style="width:24px;height:24px;border-radius:999px;background:#fff"></div></div>
+          <div style="width:50px;height:30px;border-radius:999px;background:#DDD6CA;padding:3px"><div style="width:24px;height:24px;border-radius:999px;background:#fff"></div></div>
+          <div style="width:26px;height:26px;border-radius:8px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;font:700 14px 'Space Grotesk',sans-serif">✓</div>
+          <div style="width:26px;height:26px;border-radius:8px;border:1.5px solid #DDD6CA"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 06 ROWS ─────────────────────────────── -->
+  <div style="display:flex;align-items:baseline;gap:14px;margin:64px 0 22px">
+    <div style="font:500 12px 'JetBrains Mono',monospace;color:#E8552D">06</div>
+    <div style="font:600 22px/1 'Space Grotesk',sans-serif;letter-spacing:-0.01em">Cards, list rows &amp; the receipt row</div>
+    <div style="flex:1;height:1px;background:#DDD6CA"></div>
+    <div style="font:400 13px 'Space Grotesk',sans-serif;color:#9A9389">The receipt row is the workhorse of this app</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start">
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:14px">
+      <div style="font:600 14px 'Space Grotesk',sans-serif">Interactive item row — four states</div>
+    <div style="font:400 12.5px/1.5 'Space Grotesk',sans-serif;color:#5C574F;margin-top:-4px">Used wherever items are editable. On read-only receipts, use the paper line-item style in section 09 instead.</div>
+
+      <div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border-radius:12px;background:#FFFDF8;border:1px solid #E3DDD2">
+        <div style="width:26px;height:26px;border-radius:8px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;font:700 14px 'Space Grotesk',sans-serif;flex:none">✓</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px"><div style="font:500 15px 'Space Grotesk',sans-serif">Oat milk 1L</div><div style="font:400 11.5px 'JetBrains Mono',monospace;color:#9A9389">SPLIT 6 WAYS · $0.72 EA</div></div>
+        <div style="font:500 16px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">$4.29</div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border-radius:12px;background:#FFFDF8;border:1px solid #E3DDD2;border-left:3px solid #D9A400">
+        <div style="width:26px;height:26px;border-radius:8px;background:#FDF3D6;color:#8A6A00;display:flex;align-items:center;justify-content:center;font:700 13px 'JetBrains Mono',monospace;flex:none">?</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px"><div style="font:500 15px 'Space Grotesk',sans-serif">SPCY CHKN SNDWCH</div><div style="font:400 11.5px 'JetBrains Mono',monospace;color:#8A6A00">AI UNSURE · TAP TO FIX NAME</div></div>
+        <div style="font:500 16px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">$6.50</div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border-radius:12px;background:#F6F3EC;border:1px dashed #DDD6CA">
+        <div style="width:26px;height:26px;border-radius:8px;border:1.5px solid #DDD6CA;flex:none"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px"><div style="font:500 15px 'Space Grotesk',sans-serif;color:#9A9389;text-decoration:line-through">Protein powder</div><div style="font:400 11.5px 'JetBrains Mono',monospace;color:#9A9389">3 OPTED OUT · SPLIT 3 WAYS</div></div>
+        <div style="font:500 16px 'JetBrains Mono',monospace;color:#9A9389;font-variant-numeric:tabular-nums">$29.90</div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border-radius:12px;background:#FDEBE4;border:1px solid #E8552D">
+        <div style="width:26px;height:26px;border-radius:8px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;font:700 14px 'Space Grotesk',sans-serif;flex:none">✓</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px"><div style="font:500 15px 'Space Grotesk',sans-serif">Eggs, dozen</div><div style="font:400 11.5px 'JetBrains Mono',monospace;color:#8F3418">SELECTED FOR POLL</div></div>
+        <div style="font:500 16px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">$5.99</div>
+      </div>
+
+      <div style="font:400 12.5px/1.5 'Space Grotesk',sans-serif;color:#5C574F">Left edge carries status (accent = selected, amber = needs review, dashed = excluded). Price stays anchored right at a fixed width so decimals align down the list.</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:13px">
+        <div style="font:600 14px 'Space Grotesk',sans-serif">Shop card — legacy, superseded by 09</div>
+        <div style="border:1px solid #E3DDD2;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:13px;background:#FFFDF8">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div style="display:flex;flex-direction:column;gap:3px"><div style="font:600 17px 'Space Grotesk',sans-serif">Trader Joe's</div><div style="font:400 11.5px 'JetBrains Mono',monospace;color:#9A9389">SAT 29 AUG · 18 ITEMS · BY BEN</div></div>
+            <div style="padding:5px 10px;border-radius:999px;background:#FDF3D6;color:#8A6A00;font:500 11px 'JetBrains Mono',monospace">POLL OPEN</div>
+          </div>
+          <div style="height:1px;background:#EFEBE3"></div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-end">
+            <div style="display:flex;gap:-6px">
+              <div style="width:28px;height:28px;border-radius:999px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif;border:2px solid #FFFDF8">B</div>
+              <div style="width:28px;height:28px;border-radius:999px;background:#3B7A57;color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif;border:2px solid #FFFDF8;margin-left:-8px">A</div>
+              <div style="width:28px;height:28px;border-radius:999px;background:#5C574F;color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif;border:2px solid #FFFDF8;margin-left:-8px">M</div>
+              <div style="width:28px;height:28px;border-radius:999px;background:#EFEBE3;color:#5C574F;display:flex;align-items:center;justify-content:center;font:600 11px 'Space Grotesk',sans-serif;border:2px solid #FFFDF8;margin-left:-8px">+3</div>
+            </div>
+            <div style="font:700 24px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;letter-spacing:-0.02em">$142.60</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:13px">
+        <div style="font:600 14px 'Space Grotesk',sans-serif">Avatars &amp; member chips</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 13px 6px 6px;border-radius:999px;background:#EFEBE3"><div style="width:26px;height:26px;border-radius:999px;background:#3B7A57;color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif">A</div><span style="font:500 13px 'Space Grotesk',sans-serif">Aisha</span></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 13px 6px 6px;border-radius:999px;background:#FDEBE4;border:1px solid #E8552D"><div style="width:26px;height:26px;border-radius:999px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif">B</div><span style="font:500 13px 'Space Grotesk',sans-serif">Ben · grocer</span></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 13px 6px 6px;border-radius:999px;background:#F6F3EC;opacity:.55"><div style="width:26px;height:26px;border-radius:999px;background:#9A9389;color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif">K</div><span style="font:500 13px 'Space Grotesk',sans-serif;text-decoration:line-through">Kai · out</span></div>
+        </div>
+        <div style="font:400 12.5px/1.5 'Space Grotesk',sans-serif;color:#5C574F">Avatar colors cycle through accent, sage, ink 60, amber, and two neutral tints — assigned on join, never re-shuffled.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 07 NAV & FEEDBACK ─────────────────────────────── -->
+  <div style="display:flex;align-items:baseline;gap:14px;margin:64px 0 22px">
+    <div style="font:500 12px 'JetBrains Mono',monospace;color:#E8552D">07</div>
+    <div style="font:600 22px/1 'Space Grotesk',sans-serif;letter-spacing:-0.01em">Navigation &amp; feedback</div>
+    <div style="flex:1;height:1px;background:#DDD6CA"></div>
+    <div style="font:400 13px 'Space Grotesk',sans-serif;color:#9A9389">Three tabs, one center action</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start">
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:14px">
+      <div style="font:600 14px 'Space Grotesk',sans-serif">Tab bar</div>
+      <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:20px;padding:10px 22px 16px;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;width:64px"><div style="width:20px;height:20px;border:2px solid #1C1A17;border-radius:5px"></div><div style="font:500 10.5px 'Space Grotesk',sans-serif;color:#1C1A17">Home</div></div>
+        <div style="width:54px;height:54px;border-radius:999px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;font:400 28px 'Space Grotesk',sans-serif;box-shadow:0 4px 12px rgba(232,85,45,.3)">+</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;width:64px"><div style="width:20px;height:20px;border:2px solid #9A9389;border-radius:999px"></div><div style="font:500 10.5px 'Space Grotesk',sans-serif;color:#9A9389">House</div></div>
+      </div>
+      <div style="font:400 12.5px/1.5 'Space Grotesk',sans-serif;color:#5C574F">Center button is the only way to start a shop. Active tab is ink, inactive ink 40 — no accent in the bar so the FAB stays the loudest thing.</div>
+    </div>
+
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:14px">
+      <div style="font:600 14px 'Space Grotesk',sans-serif">Toasts &amp; empty state</div>
+      <div style="display:flex;align-items:center;gap:11px;padding:13px 16px;border-radius:14px;background:#1C1A17;color:#FFFDF8"><span style="color:#7FC49B;font:700 14px 'Space Grotesk',sans-serif">✓</span><span style="font:500 14px 'Space Grotesk',sans-serif;flex:1">Copied $23.77 to clipboard</span><span style="font:500 12px 'JetBrains Mono',monospace;color:#9A9389">UNDO</span></div>
+      <div style="display:flex;align-items:center;gap:11px;padding:13px 16px;border-radius:14px;background:#FDF3D6;border:1px solid #E8CE7A;color:#6E5500"><span style="font:700 14px 'JetBrains Mono',monospace">!</span><span style="font:500 14px 'Space Grotesk',sans-serif">2 items still need a price</span></div>
+      <div style="border:1px dashed #DDD6CA;border-radius:14px;padding:26px;display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center;background:#F6F3EC">
+        <div style="width:44px;height:44px;border-radius:12px;border:2px dashed #C9C1B4"></div>
+        <div style="font:600 15px 'Space Grotesk',sans-serif">No shops yet</div>
+        <div style="font:400 13px/1.5 'Space Grotesk',sans-serif;color:#5C574F;max-width:250px;text-wrap:pretty">Snap a receipt when you get back from the store and we'll do the arithmetic.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 08 RULES ─────────────────────────────── -->
+  <div style="display:flex;align-items:baseline;gap:14px;margin:64px 0 22px">
+    <div style="font:500 12px 'JetBrains Mono',monospace;color:#E8552D">08</div>
+    <div style="font:600 22px/1 'Space Grotesk',sans-serif;letter-spacing:-0.01em">Iconography, motion &amp; voice</div>
+    <div style="flex:1;height:1px;background:#DDD6CA"></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px">
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:10px">
+      <div style="font:600 14px 'Space Grotesk',sans-serif">Iconography</div>
+      <div style="font:400 13px/1.6 'Space Grotesk',sans-serif;color:#5C574F;text-wrap:pretty">Outline only, 1.75px stroke, 24px box, round caps and joins. Geometric primitives — square, circle, chevron, plus, check. No filled glyphs, no duotone, never an icon where a two-word label is clearer. Money never gets an icon; the <code style="font:500 12px 'JetBrains Mono',monospace">$</code> is the icon.</div>
+      <div style="display:flex;gap:12px;margin-top:4px">
+        <div style="width:24px;height:24px;border:1.75px solid #1C1A17;border-radius:6px"></div>
+        <div style="width:24px;height:24px;border:1.75px solid #1C1A17;border-radius:999px"></div>
+        <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;font:400 22px 'Space Grotesk',sans-serif">+</div>
+        <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;font:500 18px 'Space Grotesk',sans-serif">✓</div>
+      </div>
+    </div>
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:10px">
+      <div style="font:600 14px 'Space Grotesk',sans-serif">Motion</div>
+      <div style="font:400 13px/1.6 'Space Grotesk',sans-serif;color:#5C574F;text-wrap:pretty">Screen push 280ms <code style="font:500 12px 'JetBrains Mono',monospace">cubic-bezier(.32,.72,0,1)</code>. Sheets slide 320ms. Row taps 120ms scale to .98. Numbers count up over 600ms when a split recalculates — that tick is the app's signature. Poll votes land with an 8px slide-in, no bounce. Nothing loops, nothing pulses.</div>
+    </div>
+    <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:10px">
+      <div style="font:600 14px 'Space Grotesk',sans-serif">Voice</div>
+      <div style="font:400 13px/1.6 'Space Grotesk',sans-serif;color:#5C574F;text-wrap:pretty">Housemate, not bank. Short, warm, a little dry. “Kai's out on the protein powder.” Never “transaction”, “settlement” or “participant”. Amounts are always stated plainly and never softened — the whole point is that nobody has to ask twice.</div>
+    </div>
+  </div>
+
+  <!-- ── 09 RECEIPT ANATOMY ─────────────────────────────── -->
+  <div style="display:flex;align-items:baseline;gap:14px;margin:64px 0 22px">
+    <div style="font:500 12px 'JetBrains Mono',monospace;color:#E8552D">09</div>
+    <div style="font:600 22px/1 'Space Grotesk',sans-serif;letter-spacing:-0.01em">Receipt anatomy</div>
+    <div style="flex:1;height:1px;background:#DDD6CA"></div>
+    <div style="font:400 13px 'Space Grotesk',sans-serif;color:#9A9389">The one layout everything else borrows from</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:340px 1fr;gap:26px;align-items:start">
+    <div>
+      <div style="height:9px;background:linear-gradient(-45deg,#FFFDF8 7px,transparent 0) 0 100%/14px 14px repeat-x,linear-gradient(45deg,#FFFDF8 7px,transparent 0) 0 100%/14px 14px repeat-x"></div>
+      <div style="background:#FFFDF8;padding:6px 22px 20px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-bottom:12px;border-bottom:1px dashed #D5CEC2">
+          <div style="font:700 15px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#1C1A17">TRADER JOE'S</div>
+          <div style="font:400 10.5px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389">29 AUG 19:42 · 12 ITEMS · BY BEN</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;align-items:baseline;gap:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#1C1A17"><span>OAT MILK 1L ×2</span><span style="flex:1;border-bottom:1px dotted #D5CEC2"></span><span>8.58</span></div>
+          <div style="display:flex;align-items:baseline;gap:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#1C1A17"><span>EGGS, DOZEN</span><span style="flex:1;border-bottom:1px dotted #D5CEC2"></span><span>5.99</span></div>
+          <div style="display:flex;align-items:baseline;gap:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#8A6A00"><span>SPCY CHKN SNDWCH ?</span><span style="flex:1;border-bottom:1px dotted #E8CE7A"></span><span>6.50</span></div>
+          <div style="display:flex;align-items:baseline;gap:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#9A9389"><span style="text-decoration:line-through">PROTEIN POWDER</span><span style="flex:1;border-bottom:1px dotted #D5CEC2"></span><span>29.90</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;padding-top:11px;border-top:1px dashed #D5CEC2">
+          <div style="display:flex;align-items:baseline;gap:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#5C574F"><span>SUBTOTAL</span><span style="flex:1;border-bottom:1px dotted #D5CEC2"></span><span>126.58</span></div>
+          <div style="display:flex;align-items:baseline;gap:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#5C574F"><span>GST 9%</span><span style="flex:1;border-bottom:1px dotted #D5CEC2"></span><span>11.39</span></div>
+        </div>
+        <div style="border-top:1px dashed #D5CEC2;border-bottom:3px double #C9C1B4;padding:10px 0;display:flex;justify-content:space-between;align-items:baseline">
+          <div style="font:500 12px 'JetBrains Mono',monospace;letter-spacing:.1em;color:#1C1A17">TOTAL PAID</div>
+          <div style="font:700 26px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;color:#1C1A17">$137.97</div>
+        </div>
+        <div style="text-align:center;font:400 10px 'JetBrains Mono',monospace;letter-spacing:.1em;color:#B5AEA2">SPLIT 6 WAYS · $22.99 EA</div>
+      </div>
+      <div style="height:9px;background:linear-gradient(-45deg,transparent 7px,#FFFDF8 0) 0 0/14px 14px repeat-x,linear-gradient(45deg,transparent 7px,#FFFDF8 0) 0 0/14px 14px repeat-x"></div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="background:#FFFDF8;border:1px dashed #C9C1B4;padding:18px;display:flex;flex-direction:column;gap:9px">
+        <div style="font:600 14px 'Space Grotesk',sans-serif">Rules of the paper</div>
+        <div style="font:400 13px/1.65 'Space Grotesk',sans-serif;color:#5C574F;text-wrap:pretty">Receipt surfaces are square-cornered with torn top and bottom edges, never a rounded card. Store names are mono, uppercase, .14em tracked and centered. Line items are mono uppercase with a dotted leader running to a right-aligned price. Group breaks are dashed; every total sits between a dashed rule above and a double rule below. Excluded lines keep their price but go ink-40 and struck through — the paper never forgets an item, it just stops charging for it.</div>
+      </div>
+      <div style="background:#FFFDF8;border:1px dashed #C9C1B4;padding:18px;display:flex;flex-direction:column;gap:9px">
+        <div style="font:600 14px 'Space Grotesk',sans-serif">Where paper stops</div>
+        <div style="font:400 13px/1.65 'Space Grotesk',sans-serif;color:#5C574F;text-wrap:pretty">Anything the user touches is app chrome, not paper: buttons, inputs, sheets, chips and the tab bar keep 12–14px radii and Space Grotesk. So a screen reads as a printed slip with soft controls resting on top — one texture for facts, one for actions.</div>
+      </div>
+      <div style="background:#FDEBE4;border:1px dashed #E8552D;padding:15px 18px;font:400 13px/1.55 'Space Grotesk',sans-serif;color:#8F3418;text-wrap:pretty"><strong style="font-weight:600">Never</strong> fake thermal-print artifacts — no faded rows, no skewed rotation, no barcode graphics. The receipt is a layout metaphor, not a costume.</div>
+    </div>
+  </div>
+
+  <div style="margin-top:48px;padding-top:22px;border-top:1px solid #DDD6CA;display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap">
+    <div style="font:400 13px/1.6 'Space Grotesk',sans-serif;color:#5C574F;max-width:620px;text-wrap:pretty"><strong style="font-weight:600;color:#1C1A17">Next:</strong> the prototype applies this to all ten screens — onboarding, home, scan, line-by-line review, poll composer, live results, grocer confirm, split breakdown, Tricount export, history and settings.</div>
+    <div style="font:500 11px 'JetBrains Mono',monospace;color:#9A9389">GROSPLIT DS · 0.1</div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:900}}"></script>
+</body>
+</html>

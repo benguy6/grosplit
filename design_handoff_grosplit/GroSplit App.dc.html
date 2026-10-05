@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E7E2D9;font-family:'Space Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#E8552D;text-decoration:none}a:hover{color:#C4401C}
+@keyframes gsIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes gsScan{0%{top:6%}100%{top:88%}}
+@keyframes gsUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes gsFade{from{opacity:0}to{opacity:1}}
+</style>
+</helmet>
+
+<div style="display:flex;gap:44px;align-items:flex-start;justify-content:center;padding:48px 40px 72px;min-height:100vh;box-sizing:border-box">
+
+  <div style="position:sticky;top:48px;width:238px;flex:none;background:#FFFDF8;border:1px dashed #C9C1B4;border-radius:4px;padding:18px 16px 16px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding-bottom:12px;border-bottom:1px dashed #D5CEC2">
+      <div style="font:700 15px 'JetBrains Mono',monospace;letter-spacing:.18em;color:#1C1A17">GROSPLIT</div>
+      <div style="font:400 10px 'JetBrains Mono',monospace;letter-spacing:.1em;color:#9A9389">PROTOTYPE · 11 SCREENS</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:1px">
+      <sc-for list="{{ nav }}" as="s" hint-placeholder-count="11">
+        <div onClick="{{ s.go }}" style="display:flex;align-items:baseline;gap:9px;padding:7px 9px;border-radius:3px;cursor:pointer;background:{{ s.bg }}" style-hover="background:#F1EDE5">
+          <div style="font:500 10px 'JetBrains Mono',monospace;color:{{ s.numColor }};width:16px">{{ s.num }}</div>
+          <div style="flex:1;font:500 11.5px 'JetBrains Mono',monospace;letter-spacing:.04em;color:{{ s.color }}">{{ s.label }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div onClick="{{ reset }}" style="margin-top:6px;padding:9px;border-top:1px dashed #D5CEC2;text-align:center;font:500 10.5px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#9A9389;cursor:pointer">↺ RESET DEMO</div>
+  </div>
+
+  <div style="flex:none;position:relative;display:flex;flex-direction:column;align-items:center;gap:16px">
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ 402 }}" height="{{ 874 }}" hint-size="402px,874px">
+
+    <!-- ══ ONBOARDING ══ -->
+    <sc-if value="{{ isOnboarding }}" hint-placeholder-val="{{ false }}">
+    <div style="min-height:874px;box-sizing:border-box;padding:78px 22px 40px;background:#EFEBE3;display:flex;flex-direction:column">
+      <div style="width:48px;height:48px;border-radius:15px;background:#E8552D;display:flex;align-items:center;justify-content:center;color:#fff;font:700 24px 'Space Grotesk',sans-serif">G</div>
+      <div style="font:700 32px/1.15 'Space Grotesk',sans-serif;letter-spacing:-0.025em;color:#1C1A17;margin-top:22px;text-wrap:pretty">Who's in the house?</div>
+      <div style="font:400 15px/1.5 'Space Grotesk',sans-serif;color:#5C574F;margin-top:8px;text-wrap:pretty">Everyone splits everything by default. The Telegram poll is how people get out of things.</div>
+
+      <div style="margin-top:26px;display:flex;flex-direction:column;gap:7px">
+        <div style="font:500 12px 'Space Grotesk',sans-serif;color:#5C574F">Household</div>
+        <div style="height:48px;border-radius:12px;border:1.5px solid #E8552D;background:#FFFDF8;box-shadow:0 0 0 4px #FDEBE4;display:flex;align-items:center;padding:0 14px;font:500 15px 'Space Grotesk',sans-serif;color:#1C1A17">Blk 42 · #05-11</div>
+      </div>
+
+      <div style="margin-top:22px;display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <div style="font:500 12px 'Space Grotesk',sans-serif;color:#5C574F">Members</div>
+          <div style="font:500 11px 'JetBrains Mono',monospace;color:#9A9389">6 OF 6</div>
+        </div>
+        <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;overflow:hidden">
+          <sc-for list="{{ members }}" as="m" hint-placeholder-count="6">
+            <div style="display:flex;align-items:center;gap:12px;min-height:56px;padding:0 15px;border-bottom:1px solid #F2EEE6">
+              <div style="width:32px;height:32px;border-radius:999px;background:{{ m.color }};color:#fff;display:flex;align-items:center;justify-content:center;font:600 13px 'Space Grotesk',sans-serif;flex:none">{{ m.ini }}</div>
+              <div style="flex:1;font:500 15px 'Space Grotesk',sans-serif;color:#1C1A17">{{ m.name }}</div>
+              <div style="font:500 11px 'JetBrains Mono',monospace;color:#9A9389">{{ m.tag }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="margin-top:18px;display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:14px;background:#FFFDF8;border:1px solid #E3DDD2">
+        <div style="width:34px;height:34px;border-radius:10px;background:#EFEBE3;display:flex;align-items:center;justify-content:center;font:500 15px 'JetBrains Mono',monospace;color:#5C574F;flex:none">TG</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+          <div style="font:500 14px 'Space Grotesk',sans-serif;color:#1C1A17">Telegram group linked</div>
+          <div style="font:400 11.5px 'JetBrains Mono',monospace;color:#9A9389">@BLK42FOOD · BOT ACTIVE</div>
+        </div>
+        <div style="width:44px;height:26px;border-radius:999px;background:#3B7A57;padding:3px;display:flex;justify-content:flex-end;flex:none"><div style="width:20px;height:20px;border-radius:999px;background:#fff"></div></div>
+      </div>
+
+      <div style="flex:1;min-height:20px"></div>
+      <div onClick="{{ goHome }}" style="height:52px;border-radius:14px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;font:600 16px 'Space Grotesk',sans-serif;cursor:pointer;transition:background .12s ease" style-hover="background:#C4401C" style-active="transform:scale(0.985)">Start splitting</div>
+    </div>
+    </sc-if>
+
+    <!-- ══ HOME ══ -->
+    <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+    <div style="min-height:874px;box-sizing:border-box;background:#EFEBE3;display:flex;flex-direction:column">
+      <div style="padding:64px 20px 14px;display:flex;align-items:flex-end;justify-content:space-between">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <div style="font:500 11px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389">BLK 42 · #05-11</div>
+          <div style="font:700 30px/1.1 'Space Grotesk',sans-serif;letter-spacing:-0.025em;color:#1C1A17">Receipts</div>
+        </div>
+        <div style="display:flex">
+          <div style="width:30px;height:30px;border-radius:999px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif;border:2px solid #EFEBE3">B</div>
+          <div style="width:30px;height:30px;border-radius:999px;background:#3B7A57;color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif;border:2px solid #EFEBE3;margin-left:-9px">A</div>
+          <div style="width:30px;height:30px;border-radius:999px;background:#5C574F;color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif;border:2px solid #EFEBE3;margin-left:-9px">M</div>
+          <div style="width:30px;height:30px;border-radius:999px;background:#EFEBE3;border:1px solid #DDD6CA;color:#5C574F;display:flex;align-items:center;justify-content:center;font:600 11px 'Space Grotesk',sans-serif;margin-left:-9px">+3</div>
+        </div>
+      </div>
+
+      <div style="padding:0 20px;display:flex;flex-direction:column;gap:12px">
+        <div onClick="{{ openCurrent }}" style="cursor:pointer;filter:drop-shadow(0 1px 2px rgba(28,26,23,.07))">
+          <div style="height:9px;background:linear-gradient(-45deg,#FFFDF8 7px,transparent 0) 0 100%/14px 14px repeat-x,linear-gradient(45deg,#FFFDF8 7px,transparent 0) 0 100%/14px 14px repeat-x"></div>
+          <div style="background:#FFFDF8;padding:4px 18px 18px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding-bottom:11px;border-bottom:1px dashed #D5CEC2">
+              <div style="font:700 15px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#1C1A17">{{ storeUpper }}</div>
+              <div style="font:400 10.5px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389">TODAY 19:42 · {{ itemCount }} ITEMS · BY {{ grocerUpper }}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;align-items:baseline;gap:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#5C574F">
+                <span>SUBTOTAL</span><span style="flex:1;border-bottom:1px dotted #D5CEC2"></span><span>{{ subtotalStr }}</span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#5C574F">
+                <span>TAX</span><span style="flex:1;border-bottom:1px dotted #D5CEC2"></span><span>{{ taxStr }}</span>
+              </div>
+            </div>
+            <div style="border-top:1px dashed #D5CEC2;border-bottom:3px double #C9C1B4;padding:10px 0;display:flex;justify-content:space-between;align-items:baseline">
+              <div style="font:500 12px 'JetBrains Mono',monospace;letter-spacing:.1em;color:#1C1A17">TOTAL PAID</div>
+              <div style="font:700 26px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;color:#1C1A17">{{ totalStr }}</div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <div style="font:400 11px/1.45 'JetBrains Mono',monospace;color:#5C574F;max-width:180px;text-wrap:pretty">{{ statusHint }}</div>
+              <div style="padding:5px 10px;background:{{ statusBg }};color:{{ statusColor }};font:500 10.5px 'JetBrains Mono',monospace;letter-spacing:.08em;white-space:nowrap">{{ statusLabel }}</div>
+            </div>
+          </div>
+          <div style="height:9px;background:linear-gradient(-45deg,transparent 7px,#FFFDF8 0) 0 0/14px 14px repeat-x,linear-gradient(45deg,transparent 7px,#FFFDF8 0) 0 0/14px 14px repeat-x"></div>
+        </div>
+
+        <div style="opacity:.62">
+          <div style="height:9px;background:linear-gradient(-45deg,#FFFDF8 7px,transparent 0) 0 100%/14px 14px repeat-x,linear-gradient(45deg,#FFFDF8 7px,transparent 0) 0 100%/14px 14px repeat-x"></div>
+          <div style="background:#FFFDF8;padding:4px 18px 16px;display:flex;flex-direction:column;gap:11px">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding-bottom:10px;border-bottom:1px dashed #D5CEC2">
+              <div style="font:700 15px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#1C1A17">SAFEWAY</div>
+              <div style="font:400 10.5px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389">25 AUG · 9 ITEMS · BY MIRA</div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <div style="font:500 11px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#5C574F">SETTLED · IN TRICOUNT</div>
+              <div style="font:700 22px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#9A9389">$61.20</div>
+            </div>
+          </div>
+          <div style="height:9px;background:linear-gradient(-45deg,transparent 7px,#FFFDF8 0) 0 0/14px 14px repeat-x,linear-gradient(45deg,transparent 7px,#FFFDF8 0) 0 0/14px 14px repeat-x"></div>
+        </div>
+      </div>
+
+      <div style="padding:26px 20px 0;display:flex;flex-direction:column;gap:10px">
+        <div style="font:500 11px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389">THIS MONTH</div>
+        <div style="display:flex;gap:12px">
+          <div style="flex:1;background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;padding:15px;display:flex;flex-direction:column;gap:5px">
+            <div style="font:700 24px 'JetBrains Mono',monospace;letter-spacing:-0.02em;color:#1C1A17">$487.15</div>
+            <div style="font:400 11.5px 'Space Grotesk',sans-serif;color:#5C574F">across 7 shops</div>
+          </div>
+          <div style="flex:1;background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;padding:15px;display:flex;flex-direction:column;gap:5px">
+            <div style="font:700 24px 'JetBrains Mono',monospace;letter-spacing:-0.02em;color:#1C1A17">$81.19</div>
+            <div style="font:400 11.5px 'Space Grotesk',sans-serif;color:#5C574F">avg. per person</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex:1;min-height:40px"></div>
+      <div style="position:sticky;bottom:0;background:#FFFDF8;border-top:1px solid #E3DDD2;padding:10px 30px 30px;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;width:64px;cursor:pointer">
+          <div style="width:20px;height:20px;border:2px solid #1C1A17;border-radius:5px"></div>
+          <div style="font:500 10.5px 'Space Grotesk',sans-serif;color:#1C1A17">Receipts</div>
+        </div>
+        <div onClick="{{ openNew }}" style="width:56px;height:56px;border-radius:999px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;font:400 30px 'Space Grotesk',sans-serif;box-shadow:0 4px 14px rgba(232,85,45,.32);cursor:pointer;margin-top:-26px" style-hover="background:#C4401C">+</div>
+        <div onClick="{{ goHouse }}" style="display:flex;flex-direction:column;align-items:center;gap:5px;width:64px;cursor:pointer">
+          <div style="width:20px;height:20px;border:2px solid #9A9389;border-radius:999px"></div>
+          <div style="font:500 10.5px 'Space Grotesk',sans-serif;color:#9A9389">House</div>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ══ SCAN ══ -->
+    <sc-if value="{{ isScan }}" hint-placeholder-val="{{ false }}">
+    <div style="min-height:874px;box-sizing:border-box;background:#1C1A17;display:flex;flex-direction:column;padding:64px 0 40px">
+      <div style="padding:0 20px;display:flex;align-items:center;justify-content:space-between">
+        <div onClick="{{ goHome }}" style="width:38px;height:38px;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;display:flex;align-items:center;justify-content:center;font:400 18px 'Space Grotesk',sans-serif;cursor:pointer">←</div>
+        <div style="font:500 13px 'Space Grotesk',sans-serif;color:#fff">{{ store }}</div>
+        <div style="width:38px"></div>
+      </div>
+
+      <div style="margin:20px;flex:1;border-radius:22px;background:#2A2622;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center">
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(180deg,#37322D 0 3px,#2E2A25 3px 22px)"></div>
+        <div style="position:absolute;left:26px;right:26px;top:44px;bottom:44px;border:2px dashed rgba(255,255,255,.28);border-radius:14px"></div>
+        <sc-if value="{{ scanning }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:26px;right:26px;height:3px;background:#E8552D;box-shadow:0 0 22px 5px rgba(232,85,45,.55);animation:gsScan 1.1s cubic-bezier(.4,0,.6,1) infinite alternate"></div>
+        </sc-if>
+        <div style="position:relative;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center;padding:0 30px">
+          <div style="font:500 12px 'JetBrains Mono',monospace;letter-spacing:.08em;color:rgba(255,255,255,.65)">{{ scanLabel }}</div>
+          <div style="font:400 13px/1.5 'Space Grotesk',sans-serif;color:rgba(255,255,255,.42);text-wrap:pretty">{{ scanHint }}</div>
+        </div>
+      </div>
+
+      <div style="padding:0 20px;display:flex;align-items:center;justify-content:space-between">
+        <div onClick="{{ goManual }}" style="padding:11px 16px;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;font:500 13px 'Space Grotesk',sans-serif;cursor:pointer">Enter manually</div>
+        <div onClick="{{ capture }}" style="width:70px;height:70px;border-radius:999px;border:3px solid rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;cursor:pointer">
+          <div style="width:56px;height:56px;border-radius:999px;background:#E8552D"></div>
+        </div>
+        <div style="padding:11px 16px;border-radius:999px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);font:500 13px 'Space Grotesk',sans-serif">Upload</div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ══ REVIEW ══ -->
+    <sc-if value="{{ isReview }}" hint-placeholder-val="{{ false }}">
+    <div style="min-height:874px;box-sizing:border-box;background:#EFEBE3;display:flex;flex-direction:column">
+      <div style="position:sticky;top:0;z-index:4;background:#EFEBE3;padding:60px 20px 10px;border-bottom:1px solid #E3DDD2">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:11px">
+          <sc-for list="{{ flow }}" as="f" hint-placeholder-count="5">
+            <div onClick="{{ f.go }}" style="flex:1;display:flex;flex-direction:column;gap:4px;cursor:pointer;padding-bottom:2px" style-hover="opacity:0.65"><div style="height:3px;background:{{ f.bar }}"></div><div style="font:500 8.5px 'JetBrains Mono',monospace;letter-spacing:.06em;color:{{ f.color }}">{{ f.label }}</div></div>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div onClick="{{ goHome }}" style="width:34px;height:34px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;display:flex;align-items:center;justify-content:center;font:400 16px 'Space Grotesk',sans-serif;color:#1C1A17;cursor:pointer">←</div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+            <div style="font:600 18px 'Space Grotesk',sans-serif;color:#1C1A17">Review {{ itemCount }} items</div>
+            <div style="font:400 11.5px 'JetBrains Mono',monospace;color:#9A9389">{{ reviewMeta }}</div>
+          </div>
+          <div style="font:700 20px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#1C1A17">{{ totalStr }}</div>
+        </div>
+        <sc-if value="{{ hasFlags }}" hint-placeholder-val="{{ true }}">
+          <div style="margin-top:11px;display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:12px;background:#FDF3D6;border:1px solid #E8CE7A">
+            <span style="font:700 13px 'JetBrains Mono',monospace;color:#8A6A00">!</span>
+            <span style="font:500 13px 'Space Grotesk',sans-serif;color:#6E5500;flex:1">{{ flagLabel }}</span>
+            <span onClick="{{ fixAll }}" style="font:500 12px 'Space Grotesk',sans-serif;color:#8A6A00;text-decoration:underline;cursor:pointer">Fix all</span>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="padding:12px 20px 0;display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ reviewRows }}" as="it" hint-placeholder-count="12">
+          <div onClick="{{ it.onTap }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;cursor:pointer;background:{{ it.bg }};border:1px solid {{ it.bd }};border-left:3px solid {{ it.edge }};animation:gsIn .28s ease both">
+            <div style="width:26px;height:26px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;font:700 13px 'Space Grotesk',sans-serif;background:{{ it.boxBg }};color:{{ it.boxColor }};border:1.5px solid {{ it.boxBd }}">{{ it.mark }}</div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+              <div style="font:500 15px 'Space Grotesk',sans-serif;color:{{ it.nameColor }};text-decoration:{{ it.strike }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ it.name }}</div>
+              <div style="font:400 11px 'JetBrains Mono',monospace;letter-spacing:.03em;color:{{ it.subColor }}">{{ it.sub }}</div>
+            </div>
+            <div style="font:500 16px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:{{ it.priceColor }}">{{ it.priceStr }}</div>
+            <div onClick="{{ it.onEdit }}" style="flex:none;padding:6px 10px;border-radius:999px;background:#EFEBE3;border:1px solid #E3DDD2;font:500 11px 'Space Grotesk',sans-serif;color:#5C574F;cursor:pointer" style-hover="background:#E4DFD5">Edit</div>
+          </div>
+        </sc-for>
+        <div onClick="{{ goManual }}" style="height:48px;border-radius:12px;border:1.5px dashed #D5CEC2;display:flex;align-items:center;justify-content:center;gap:8px;font:500 14px 'Space Grotesk',sans-serif;color:#5C574F;cursor:pointer;margin-top:2px" style-hover="background:#F4F0E8">+ Add an item</div>
+
+        <div style="margin-top:14px;background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:13px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;font:400 13.5px 'Space Grotesk',sans-serif;color:#5C574F">
+            <span>Subtotal</span><span style="font:500 14px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#1C1A17">{{ subtotalStr }}</span>
+          </div>
+          <div style="height:1px;background:#F2EEE6"></div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <div style="font:500 14px 'Space Grotesk',sans-serif;color:#1C1A17">Split the tax too</div>
+              <div style="font:400 10.5px 'JetBrains Mono',monospace;letter-spacing:.03em;color:#9A9389">{{ taxRowNote }}</div>
+            </div>
+            <div style="font:500 14px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#1C1A17">{{ taxStr }}</div>
+            <div onClick="{{ toggleTax }}" style="width:46px;height:28px;border-radius:999px;background:{{ taxToggleBg }};padding:3px;display:flex;justify-content:{{ taxToggleJustify }};flex:none;cursor:pointer;transition:background .15s ease"><div style="width:22px;height:22px;border-radius:999px;background:#fff"></div></div>
+          </div>
+          <sc-if value="{{ taxOn }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="height:38px;border-radius:11px;background:#EFEBE3;padding:4px;display:flex;gap:4px">
+                <div onClick="{{ setTaxPro }}" style="flex:1;border-radius:8px;background:{{ taxProBg }};color:{{ taxProColor }};display:flex;align-items:center;justify-content:center;font:500 12.5px 'Space Grotesk',sans-serif;cursor:pointer">By share</div>
+                <div onClick="{{ setTaxEven }}" style="flex:1;border-radius:8px;background:{{ taxEvenBg }};color:{{ taxEvenColor }};display:flex;align-items:center;justify-content:center;font:500 12.5px 'Space Grotesk',sans-serif;cursor:pointer">6 ways</div>
+              </div>
+              <div style="font:400 12px 'Space Grotesk',sans-serif;color:#5C574F">{{ taxModeNote }}</div>
+            </div>
+          </sc-if>
+          <div style="height:1px;background:#F2EEE6"></div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <span style="font:600 15px 'Space Grotesk',sans-serif;color:#1C1A17">Total</span>
+            <span style="font:700 22px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;color:#1C1A17">{{ totalStr }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex:1;min-height:28px"></div>
+      <div style="position:sticky;bottom:0;background:#EFEBE3;border-top:1px solid #E3DDD2;padding:12px 20px 34px;display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;justify-content:space-between;font:500 12.5px 'Space Grotesk',sans-serif;color:#5C574F">
+          <span>Everyone in on everything</span><span style="font:500 12.5px 'JetBrains Mono',monospace">{{ evenShareStr }} each</span>
+        </div>
+        <div onClick="{{ goPoll }}" style="height:52px;border-radius:14px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;gap:9px;font:600 16px 'Space Grotesk',sans-serif;cursor:pointer" style-hover="background:#C4401C"><span style="font:500 12px 'JetBrains Mono',monospace;color:rgba(255,255,255,.7)">TG</span>Send poll to @blk42food</div>
+        <div onClick="{{ goConfirm }}" style="height:44px;border-radius:14px;background:transparent;display:flex;align-items:center;justify-content:center;gap:7px;font:500 14px 'Space Grotesk',sans-serif;color:#5C574F;cursor:pointer" style-hover="background:#E4DFD5">Skip the poll — split all 6 ways</div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ══ MANUAL ENTRY ══ -->
+    <sc-if value="{{ isManual }}" hint-placeholder-val="{{ false }}">
+    <div style="min-height:874px;box-sizing:border-box;background:#EFEBE3;padding:60px 20px 40px;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div onClick="{{ goReview }}" style="width:34px;height:34px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;display:flex;align-items:center;justify-content:center;font:400 16px 'Space Grotesk',sans-serif;cursor:pointer">←</div>
+        <div style="font:600 18px 'Space Grotesk',sans-serif;color:#1C1A17">Add item</div>
+      </div>
+
+      <div style="margin-top:22px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font:500 12px 'Space Grotesk',sans-serif;color:#5C574F">Item name</div>
+          <div style="height:50px;border-radius:12px;border:1.5px solid #E8552D;background:#FFFDF8;box-shadow:0 0 0 4px #FDEBE4;display:flex;align-items:center;padding:0 14px;font:400 15px 'Space Grotesk',sans-serif;color:#1C1A17">{{ draftName }}<span style="width:1.5px;height:20px;background:#E8552D;margin-left:2px"></span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font:500 12px 'Space Grotesk',sans-serif;color:#5C574F">Price</div>
+          <div style="height:50px;border-radius:12px;border:1px solid #E3DDD2;background:#FFFDF8;display:flex;align-items:center;justify-content:space-between;padding:0 14px">
+            <span style="font:500 15px 'JetBrains Mono',monospace;color:#9A9389">{{ cur }}</span>
+            <span style="font:500 19px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#1C1A17">{{ draftPrice }}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap">
+          <sc-for list="{{ quickNames }}" as="q" hint-placeholder-count="5">
+            <div onClick="{{ q.pick }}" style="padding:9px 14px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;font:500 13px 'Space Grotesk',sans-serif;color:#1C1A17;cursor:pointer" style-hover="background:#F4F0E8">{{ q.label }}</div>
+          </sc-for>
+        </div>
+        <div style="display:flex;gap:9px">
+          <sc-for list="{{ keypad }}" as="k" hint-placeholder-count="6">
+            <div onClick="{{ k.tap }}" style="flex:1;height:44px;border-radius:11px;background:#FFFDF8;border:1px solid #E3DDD2;display:flex;align-items:center;justify-content:center;font:500 15px 'JetBrains Mono',monospace;color:#1C1A17;cursor:pointer" style-hover="background:#F4F0E8">{{ k.label }}</div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="flex:1;min-height:20px"></div>
+      <div onClick="{{ addDraft }}" style="height:52px;border-radius:14px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;font:600 16px 'Space Grotesk',sans-serif;cursor:pointer" style-hover="background:#C4401C">Add to receipt</div>
+    </div>
+    </sc-if>
+
+    <!-- ══ POLL COMPOSER ══ -->
+    <sc-if value="{{ isPoll }}" hint-placeholder-val="{{ false }}">
+    <div style="min-height:874px;box-sizing:border-box;background:#EFEBE3;display:flex;flex-direction:column">
+      <div style="position:sticky;top:0;z-index:4;background:#EFEBE3;padding:60px 20px 10px;border-bottom:1px solid #E3DDD2;display:flex;flex-direction:column;gap:11px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div onClick="{{ goHome }}" style="width:34px;height:34px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;display:flex;align-items:center;justify-content:center;font:400 16px 'Space Grotesk',sans-serif;cursor:pointer">←</div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+            <div style="font:600 18px 'Space Grotesk',sans-serif;color:#1C1A17">Anything worth a poll?</div>
+            <div style="font:400 11.5px 'JetBrains Mono',monospace;color:#9A9389">OPTIONAL · {{ pollCount }} PICKED</div>
+          </div>
+          <div onClick="{{ toggleSelectAll }}" style="flex:none;padding:8px 11px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;font:500 10px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#5C574F;cursor:pointer;white-space:nowrap" style-hover="background:#F4F0E8">{{ selectAllLabel }}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <sc-for list="{{ flow }}" as="f" hint-placeholder-count="5">
+            <div onClick="{{ f.go }}" style="flex:1;display:flex;flex-direction:column;gap:4px;cursor:pointer;padding-bottom:2px" style-hover="opacity:0.65"><div style="height:3px;background:{{ f.bar }}"></div><div style="font:500 8.5px 'JetBrains Mono',monospace;letter-spacing:.06em;color:{{ f.color }}">{{ f.label }}</div></div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="padding:14px 20px 0;font:400 13px/1.5 'Space Grotesk',sans-serif;color:#5C574F;text-wrap:pretty">Default is simple: everyone pays for everything. Only pick the items where someone might reasonably want out — those go into one Telegram poll.</div>
+
+      <div style="padding:14px 20px 0;display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ pollRows }}" as="it" hint-placeholder-count="12">
+          <div onClick="{{ it.onTap }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;cursor:pointer;background:{{ it.bg }};border:1px solid {{ it.bd }}">
+            <div style="width:26px;height:26px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;font:700 13px 'Space Grotesk',sans-serif;background:{{ it.boxBg }};color:#fff;border:1.5px solid {{ it.boxBd }}">{{ it.mark }}</div>
+            <div style="flex:1;font:500 15px 'Space Grotesk',sans-serif;color:#1C1A17;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ it.name }}</div>
+            <div style="font:500 15px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#5C574F">{{ it.priceStr }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="padding:22px 20px 0;display:flex;flex-direction:column;gap:9px">
+        <div style="font:500 11px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389">TELEGRAM PREVIEW</div>
+        <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;border-top-left-radius:6px;padding:15px;display:flex;flex-direction:column;gap:10px">
+          <div style="font:500 14px/1.45 'Space Grotesk',sans-serif;color:#1C1A17">🛒 {{ store }} · {{ totalStr }}<br>Tick anything you're NOT in on. Closes in 4h.</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ pollPreview }}" as="p" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:10px;background:#F4F0E8">
+                <div style="width:16px;height:16px;border-radius:999px;border:1.5px solid #C9C1B4;flex:none"></div>
+                <div style="flex:1;font:400 13px 'Space Grotesk',sans-serif;color:#1C1A17;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font:400 11px 'JetBrains Mono',monospace;color:#9A9389">MULTI-SELECT · ANONYMOUS: OFF</div>
+        </div>
+      </div>
+
+      <div style="flex:1;min-height:28px"></div>
+      <div style="position:sticky;bottom:0;background:#EFEBE3;border-top:1px solid #E3DDD2;padding:12px 20px 34px;display:flex;flex-direction:column;gap:8px">
+        <div onClick="{{ sendPoll }}" style="height:52px;border-radius:14px;background:{{ postBg }};color:#fff;display:flex;align-items:center;justify-content:center;font:600 16px 'Space Grotesk',sans-serif;cursor:pointer">{{ postLabel }}</div>
+        <div onClick="{{ goConfirm }}" style="height:40px;display:flex;align-items:center;justify-content:center;font:500 13.5px 'Space Grotesk',sans-serif;color:#5C574F;cursor:pointer;border-radius:12px" style-hover="background:#E4DFD5">Skip — split all 6 ways</div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ══ POLL LIVE ══ -->
+    <sc-if value="{{ isLive }}" hint-placeholder-val="{{ false }}">
+    <div style="min-height:874px;box-sizing:border-box;background:#EFEBE3;display:flex;flex-direction:column">
+      <div style="position:sticky;top:0;z-index:4;background:#EFEBE3;padding:60px 20px 10px;border-bottom:1px solid #E3DDD2;display:flex;flex-direction:column;gap:11px">
+        <div style="display:flex;align-items:center;gap:5px">
+          <sc-for list="{{ flow }}" as="f" hint-placeholder-count="5">
+            <div onClick="{{ f.go }}" style="flex:1;display:flex;flex-direction:column;gap:4px;cursor:pointer;padding-bottom:2px" style-hover="opacity:0.65"><div style="height:3px;background:{{ f.bar }}"></div><div style="font:500 8.5px 'JetBrains Mono',monospace;letter-spacing:.06em;color:{{ f.color }}">{{ f.label }}</div></div>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div onClick="{{ goHome }}" style="width:34px;height:34px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;display:flex;align-items:center;justify-content:center;font:400 16px 'Space Grotesk',sans-serif;cursor:pointer">←</div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+            <div style="font:600 18px 'Space Grotesk',sans-serif;color:#1C1A17">Poll is live</div>
+            <div style="font:400 11.5px 'JetBrains Mono',monospace;color:#9A9389">{{ votedCount }} OF 5 VOTED · CLOSES IN 3H 52M</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:16px 20px 0;display:flex;flex-direction:column;gap:11px">
+        <div style="display:flex;gap:8px">
+          <sc-for list="{{ voterChips }}" as="v" hint-placeholder-count="5">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 4px;border-radius:12px;background:{{ v.bg }};border:1px solid {{ v.bd }};animation:gsIn .3s ease both">
+              <div style="width:30px;height:30px;border-radius:999px;background:{{ v.avatar }};color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif">{{ v.ini }}</div>
+              <div style="font:500 10px 'JetBrains Mono',monospace;color:{{ v.labelColor }}">{{ v.label }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="font:500 11px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389;margin-top:6px">OPT-OUTS COMING IN</div>
+        <sc-for list="{{ liveRows }}" as="it" hint-placeholder-count="5">
+          <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+              <div style="font:500 15px 'Space Grotesk',sans-serif;color:#1C1A17;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ it.name }}</div>
+              <div style="font:500 15px 'JetBrains Mono',monospace;color:#1C1A17">{{ it.priceStr }}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px">
+              <div style="display:flex">
+                <sc-for list="{{ it.outs }}" as="o" hint-placeholder-count="2">
+                  <div style="width:24px;height:24px;border-radius:999px;background:{{ o.color }};color:#fff;display:flex;align-items:center;justify-content:center;font:600 11px 'Space Grotesk',sans-serif;border:2px solid #FFFDF8;margin-left:-6px;animation:gsIn .25s ease both">{{ o.ini }}</div>
+                </sc-for>
+              </div>
+              <div style="flex:1;font:400 11.5px 'JetBrains Mono',monospace;color:{{ it.noteColor }}">{{ it.note }}</div>
+              <div style="font:500 12px 'JetBrains Mono',monospace;color:#5C574F">{{ it.eachStr }} EA</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="flex:1;min-height:28px"></div>
+      <div style="position:sticky;bottom:0;background:#EFEBE3;border-top:1px solid #E3DDD2;padding:12px 20px 34px;display:flex;flex-direction:column;gap:9px">
+        <div style="font:400 12px 'Space Grotesk',sans-serif;color:#5C574F;text-align:center">{{ liveFooter }}</div>
+        <div onClick="{{ closePoll }}" style="height:52px;border-radius:14px;background:{{ closeBg }};color:#fff;display:flex;align-items:center;justify-content:center;font:600 16px 'Space Grotesk',sans-serif;cursor:pointer">{{ closeLabel }}</div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ══ CONFIRM / SPLIT ══ -->
+    <sc-if value="{{ isConfirm }}" hint-placeholder-val="{{ false }}">
+    <div style="min-height:874px;box-sizing:border-box;background:#EFEBE3;display:flex;flex-direction:column">
+      <div style="position:sticky;top:0;z-index:4;background:#EFEBE3;padding:60px 20px 10px;border-bottom:1px solid #E3DDD2;display:flex;flex-direction:column;gap:11px">
+        <div style="display:flex;align-items:center;gap:5px">
+          <sc-for list="{{ flow }}" as="f" hint-placeholder-count="5">
+            <div onClick="{{ f.go }}" style="flex:1;display:flex;flex-direction:column;gap:4px;cursor:pointer;padding-bottom:2px" style-hover="opacity:0.65"><div style="height:3px;background:{{ f.bar }}"></div><div style="font:500 8.5px 'JetBrains Mono',monospace;letter-spacing:.06em;color:{{ f.color }}">{{ f.label }}</div></div>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div onClick="{{ backFromConfirm }}" style="width:34px;height:34px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;display:flex;align-items:center;justify-content:center;font:400 16px 'Space Grotesk',sans-serif;cursor:pointer">←</div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+            <div style="font:600 18px 'Space Grotesk',sans-serif;color:#1C1A17">The split</div>
+            <div style="font:400 11.5px 'JetBrains Mono',monospace;color:#9A9389">{{ confirmMeta }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:18px 20px 0;display:flex;flex-direction:column;gap:12px">
+        <div style="background:#1C1A17;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:6px">
+          <div style="font:500 11px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389">{{ grocerPaidLabel }}</div>
+          <div style="font:700 40px/1 'JetBrains Mono',monospace;letter-spacing:-0.04em;color:#FFFDF8">{{ totalStr }}</div>
+          <div style="font:400 13px 'Space Grotesk',sans-serif;color:#B7B0A5">{{ owedSummary }}</div>
+          <div style="margin-top:8px;padding-top:10px;border-top:1px solid rgba(255,253,248,.14);display:flex;justify-content:space-between;font:500 11px 'JetBrains Mono',monospace;letter-spacing:.04em;color:#9A9389">
+            <span>SUBTOTAL {{ subtotalStr }}</span><span>{{ taxLine }}</span>
+          </div>
+        </div>
+
+        <div style="background:#FFFDF8;padding:16px 18px;display:flex;flex-direction:column;gap:12px">
+          <div style="text-align:center;font:500 11px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#9A9389;padding-bottom:10px;border-bottom:1px dashed #D5CEC2">WHO OWES WHAT</div>
+          <sc-for list="{{ splitRows }}" as="p" hint-placeholder-count="6">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <div style="width:22px;height:22px;border-radius:999px;background:{{ p.color }};color:#fff;display:flex;align-items:center;justify-content:center;font:600 11px 'Space Grotesk',sans-serif;flex:none">{{ p.ini }}</div>
+                <div style="font:500 13.5px 'JetBrains Mono',monospace;letter-spacing:.02em;color:#1C1A17">{{ p.nameUpper }}</div>
+                <sc-if value="{{ p.isGrocer }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:2px 7px;background:#EFEBE3;font:500 9px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#5C574F">GROCER</div>
+                </sc-if>
+                <div style="flex:1;border-bottom:1px dotted #D5CEC2"></div>
+                <div style="font:600 17px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:{{ p.amountColor }}">{{ p.amountStr }}</div>
+              </div>
+              <div style="padding-left:30px;font:400 10px 'JetBrains Mono',monospace;letter-spacing:.04em;color:#B5AEA2">{{ p.detail }}</div>
+            </div>
+          </sc-for>
+          <div style="margin-top:2px;border-top:1px dashed #D5CEC2;border-bottom:3px double #C9C1B4;padding:9px 0;display:flex;justify-content:space-between;font:500 11.5px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#1C1A17">
+            <span>SUM OF SHARES</span><span>{{ totalStr }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex:1;min-height:28px"></div>
+      <div style="position:sticky;bottom:0;background:#EFEBE3;border-top:1px solid #E3DDD2;padding:12px 20px 34px;display:flex;flex-direction:column;gap:9px">
+        <div style="font:400 12px/1.45 'Space Grotesk',sans-serif;color:#5C574F;text-align:center;text-wrap:pretty">{{ lockNote }}</div>
+        <div onClick="{{ confirmSplit }}" style="height:52px;border-radius:14px;background:{{ lockBg }};color:#fff;display:flex;align-items:center;justify-content:center;gap:9px;font:600 16px 'Space Grotesk',sans-serif;cursor:{{ lockCursor }}"><span style="font:700 15px 'Space Grotesk',sans-serif">{{ lockMark }}</span>{{ lockLabel }}</div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ══ EXPORT ══ -->
+    <sc-if value="{{ isExport }}" hint-placeholder-val="{{ false }}">
+    <div style="min-height:874px;box-sizing:border-box;background:#EFEBE3;display:flex;flex-direction:column">
+      <div style="position:sticky;top:0;z-index:4;background:#EFEBE3;padding:60px 20px 10px;border-bottom:1px solid #E3DDD2;display:flex;flex-direction:column;gap:11px">
+        <div style="display:flex;align-items:center;gap:5px">
+          <sc-for list="{{ flow }}" as="f" hint-placeholder-count="5">
+            <div onClick="{{ f.go }}" style="flex:1;display:flex;flex-direction:column;gap:4px;cursor:pointer;padding-bottom:2px" style-hover="opacity:0.65"><div style="height:3px;background:{{ f.bar }}"></div><div style="font:500 8.5px 'JetBrains Mono',monospace;letter-spacing:.06em;color:{{ f.color }}">{{ f.label }}</div></div>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div onClick="{{ goHome }}" style="width:34px;height:34px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;display:flex;align-items:center;justify-content:center;font:400 16px 'Space Grotesk',sans-serif;cursor:pointer">←</div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+            <div style="font:600 18px 'Space Grotesk',sans-serif;color:#1C1A17">Put it in Tricount</div>
+            <div style="font:400 11.5px 'JetBrains Mono',monospace;color:#9A9389">{{ exportMeta }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:18px 20px 0;display:flex;flex-direction:column;gap:12px">
+        <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div style="font:500 11px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389">TRICOUNT ENTRY</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;font:400 13.5px 'Space Grotesk',sans-serif;color:#5C574F"><span>Title</span><span style="color:#1C1A17;font-weight:500">{{ tricountTitle }}</span></div>
+            <div style="display:flex;justify-content:space-between;font:400 13.5px 'Space Grotesk',sans-serif;color:#5C574F"><span>Paid by</span><span style="color:#1C1A17;font-weight:500">{{ grocerName }}</span></div>
+            <div style="display:flex;justify-content:space-between;font:400 13.5px 'Space Grotesk',sans-serif;color:#5C574F"><span>Amount</span><span style="color:#1C1A17;font:500 14px 'JetBrains Mono',monospace">{{ totalStr }}</span></div>
+            <div style="display:flex;justify-content:space-between;font:400 13.5px 'Space Grotesk',sans-serif;color:#5C574F"><span>Split</span><span style="color:#1C1A17;font-weight:500">Unequally · 6 people</span></div>
+          </div>
+        </div>
+
+        <div style="font:500 11px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389">TAP A ROW TO COPY THE NUMBER</div>
+        <sc-for list="{{ exportRows }}" as="p" hint-placeholder-count="6">
+          <div onClick="{{ p.copy }}" style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:12px;cursor:pointer" style-hover="background:#F9F6EF">
+            <div style="width:30px;height:30px;border-radius:999px;background:{{ p.color }};color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif;flex:none">{{ p.ini }}</div>
+            <div style="flex:1;font:500 15px 'Space Grotesk',sans-serif;color:#1C1A17">{{ p.name }}</div>
+            <div style="font:600 17px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#1C1A17">{{ p.amountStr }}</div>
+            <div style="font:500 11px 'JetBrains Mono',monospace;color:#9A9389">COPY</div>
+          </div>
+        </sc-for>
+
+        <div style="display:flex;gap:10px;margin-top:4px">
+          <div onClick="{{ copyAll }}" style="flex:1;height:46px;border-radius:13px;background:#FFFDF8;border:1.5px solid #1C1A17;display:flex;align-items:center;justify-content:center;font:600 14px 'Space Grotesk',sans-serif;color:#1C1A17;cursor:pointer" style-hover="background:#F4F0E8">Copy all 5</div>
+          <div onClick="{{ exportCsv }}" style="flex:1;height:46px;border-radius:13px;background:#EFEBE3;border:1px solid #E3DDD2;display:flex;align-items:center;justify-content:center;font:600 14px 'Space Grotesk',sans-serif;color:#5C574F;cursor:pointer" style-hover="background:#E7E2D8">Export CSV</div>
+        </div>
+      </div>
+
+      <div style="flex:1;min-height:28px"></div>
+      <div style="position:sticky;bottom:0;background:#EFEBE3;border-top:1px solid #E3DDD2;padding:12px 20px 34px">
+        <div onClick="{{ finish }}" style="height:52px;border-radius:14px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;font:600 16px 'Space Grotesk',sans-serif;cursor:pointer" style-hover="background:#C4401C">Done — back to receipts</div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ══ HISTORY ══ -->
+    <sc-if value="{{ isHistory }}" hint-placeholder-val="{{ false }}">
+    <div style="min-height:874px;box-sizing:border-box;background:#EFEBE3;display:flex;flex-direction:column">
+      <div style="padding:60px 20px 12px;display:flex;align-items:center;gap:12px">
+        <div onClick="{{ goHome }}" style="width:34px;height:34px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;display:flex;align-items:center;justify-content:center;font:400 16px 'Space Grotesk',sans-serif;cursor:pointer">←</div>
+        <div style="font:600 18px 'Space Grotesk',sans-serif;color:#1C1A17">History</div>
+      </div>
+      <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ history }}" as="h" hint-placeholder-count="6">
+          <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px">
+            <div style="width:34px;height:34px;border-radius:999px;background:{{ h.color }};color:#fff;display:flex;align-items:center;justify-content:center;font:600 13px 'Space Grotesk',sans-serif;flex:none">{{ h.ini }}</div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <div style="font:500 15px 'Space Grotesk',sans-serif;color:#1C1A17">{{ h.store }}</div>
+              <div style="font:400 11px 'JetBrains Mono',monospace;color:#9A9389">{{ h.meta }}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+              <div style="font:600 16px 'JetBrains Mono',monospace;color:#1C1A17">{{ h.total }}</div>
+              <div style="font:500 10px 'JetBrains Mono',monospace;color:#9A9389">{{ h.each }} EA</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding:22px 20px 0">
+        <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px">
+          <div style="font:500 11px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#9A9389">WHO SHOPS MOST</div>
+          <sc-for list="{{ shopStats }}" as="s" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;gap:11px">
+              <div style="width:56px;font:500 13px 'Space Grotesk',sans-serif;color:#1C1A17">{{ s.name }}</div>
+              <div style="flex:1;height:9px;border-radius:999px;background:#EFEBE3;overflow:hidden"><div style="height:9px;border-radius:999px;background:{{ s.color }};width:{{ s.pct }}"></div></div>
+              <div style="font:500 11px 'JetBrains Mono',monospace;color:#9A9389;width:28px;text-align:right">{{ s.n }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ══ HOUSE / SETTINGS ══ -->
+    <sc-if value="{{ isHouse }}" hint-placeholder-val="{{ false }}">
+    <div style="min-height:874px;box-sizing:border-box;background:#EFEBE3;display:flex;flex-direction:column">
+      <div style="padding:60px 20px 12px;display:flex;align-items:center;gap:12px">
+        <div style="flex:1;font:600 18px 'Space Grotesk',sans-serif;color:#1C1A17">Blk 42 · #05-11</div>
+        <div onClick="{{ goHistory }}" style="padding:8px 13px;border-radius:999px;background:#FFFDF8;border:1px solid #E3DDD2;font:500 12px 'Space Grotesk',sans-serif;color:#1C1A17;cursor:pointer">History</div>
+      </div>
+
+      <div style="padding:6px 20px 0;display:flex;flex-direction:column;gap:14px">
+        <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;overflow:hidden">
+          <sc-for list="{{ members }}" as="m" hint-placeholder-count="6">
+            <div style="border-bottom:1px solid #F2EEE6">
+              <div style="display:flex;align-items:center;gap:12px;min-height:58px;padding:0 15px">
+                <div onClick="{{ m.openColor }}" style="width:32px;height:32px;border-radius:999px;background:{{ m.color }};color:#fff;display:flex;align-items:center;justify-content:center;font:600 13px 'Space Grotesk',sans-serif;flex:none;cursor:pointer">{{ m.ini }}</div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+                  <div style="font:500 15px 'Space Grotesk',sans-serif;color:#1C1A17">{{ m.name }}</div>
+                  <div style="font:400 11px 'JetBrains Mono',monospace;color:#9A9389">{{ m.handle }}</div>
+                </div>
+                <div style="font:500 11px 'JetBrains Mono',monospace;color:#9A9389">{{ m.tag }}</div>
+                <div onClick="{{ m.openColor }}" style="flex:none;display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#EFEBE3;border:1px solid #E3DDD2;cursor:pointer" style-hover="background:#E4DFD5">
+                  <div style="width:12px;height:12px;border-radius:999px;background:{{ m.color }}"></div>
+                  <div style="font:500 9.5px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#5C574F">COLOR</div>
+                </div>
+              </div>
+              <sc-if value="{{ m.editing }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:8px;padding:0 15px 14px;flex-wrap:wrap;animation:gsIn .2s ease both">
+                  <sc-for list="{{ m.swatches }}" as="c" hint-placeholder-count="8">
+                    <div onClick="{{ c.pick }}" style="width:28px;height:28px;border-radius:999px;background:{{ c.hex }};box-shadow:0 0 0 2px #FFFDF8,0 0 0 3.5px {{ c.ring }};cursor:pointer"></div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <div style="display:flex;align-items:center;gap:12px;min-height:56px;padding:0 15px;cursor:pointer">
+            <div style="width:32px;height:32px;border-radius:999px;background:#EFEBE3;display:flex;align-items:center;justify-content:center;font:400 18px 'Space Grotesk',sans-serif;color:#5C574F">+</div>
+            <div style="font:500 15px 'Space Grotesk',sans-serif;color:#5C574F">Invite a housemate</div>
+          </div>
+        </div>
+
+        <div style="background:#FFFDF8;border:1px solid #E3DDD2;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <div style="font:500 15px 'Space Grotesk',sans-serif;color:#1C1A17">Poll window</div>
+              <div style="font:400 12px 'Space Grotesk',sans-serif;color:#5C574F">How long people get to opt out</div>
+            </div>
+            <div style="padding:7px 12px;border-radius:999px;background:#EFEBE3;font:500 12px 'JetBrains Mono',monospace;color:#1C1A17">4H</div>
+          </div>
+          <div style="height:1px;background:#F2EEE6"></div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <div style="font:500 15px 'Space Grotesk',sans-serif;color:#1C1A17">Auto-flag staples</div>
+              <div style="font:400 12px 'Space Grotesk',sans-serif;color:#5C574F">Milk, soap, towels never enter the poll</div>
+            </div>
+            <div style="width:46px;height:28px;border-radius:999px;background:#3B7A57;padding:3px;display:flex;justify-content:flex-end;flex:none"><div style="width:22px;height:22px;border-radius:999px;background:#fff"></div></div>
+          </div>
+          <div style="height:1px;background:#F2EEE6"></div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <div style="font:500 15px 'Space Grotesk',sans-serif;color:#1C1A17">Round to nearest cent</div>
+              <div style="font:400 12px 'Space Grotesk',sans-serif;color:#5C574F">Remainder goes to the grocer</div>
+            </div>
+            <div style="width:46px;height:28px;border-radius:999px;background:#3B7A57;padding:3px;display:flex;justify-content:flex-end;flex:none"><div style="width:22px;height:22px;border-radius:999px;background:#fff"></div></div>
+          </div>
+        </div>
+
+        <div style="font:400 11.5px/1.5 'JetBrains Mono',monospace;color:#9A9389;text-align:center;padding-bottom:16px">GROSPLIT 0.1 · TELEGRAM BOT CONNECTED</div>
+      </div>
+      <div style="flex:1;min-height:20px"></div>
+      <div style="position:sticky;bottom:0;background:#FFFDF8;border-top:1px solid #E3DDD2;padding:10px 30px 30px;display:flex;align-items:center;justify-content:space-between">
+        <div onClick="{{ goHome }}" style="display:flex;flex-direction:column;align-items:center;gap:5px;width:64px;cursor:pointer">
+          <div style="width:20px;height:20px;border:2px solid #9A9389;border-radius:5px"></div>
+          <div style="font:500 10.5px 'Space Grotesk',sans-serif;color:#9A9389">Receipts</div>
+        </div>
+        <div onClick="{{ openNew }}" style="width:56px;height:56px;border-radius:999px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;font:400 30px 'Space Grotesk',sans-serif;box-shadow:0 4px 14px rgba(232,85,45,.32);cursor:pointer;margin-top:-26px" style-hover="background:#C4401C">+</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;width:64px">
+          <div style="width:20px;height:20px;border:2px solid #1C1A17;border-radius:999px"></div>
+          <div style="font:500 10.5px 'Space Grotesk',sans-serif;color:#1C1A17">House</div>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ══ NEW RECEIPT SHEET ══ -->
+    <sc-if value="{{ newSheet }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:95;background:rgba(28,26,23,.38);display:flex;align-items:flex-end;animation:gsFade .18s ease both">
+        <div onClick="{{ closeNew }}" style="position:absolute;inset:0;cursor:pointer"></div>
+        <div style="position:relative;width:100%;animation:gsUp .34s cubic-bezier(.32,.72,0,1) both">
+          <div style="height:11px;background:linear-gradient(-45deg,transparent 8px,#FFFDF8 0) 0 0/16px 16px repeat-x,linear-gradient(45deg,transparent 8px,#FFFDF8 0) 0 0/16px 16px repeat-x"></div>
+          <div style="background:#FFFDF8;padding:16px 22px 34px;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-bottom:13px;border-bottom:1px dashed #D5CEC2">
+              <div style="font:700 14px 'JetBrains Mono',monospace;letter-spacing:.18em;color:#1C1A17">NEW RECEIPT</div>
+              <div style="font:400 10.5px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#9A9389">{{ todayStr }}</div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="font:500 10.5px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#9A9389">WHERE DID YOU SHOP?</div>
+              <input value="{{ storeDraft }}" onChange="{{ setStore }}" placeholder="Store name" style="height:52px;border-radius:12px;border:1.5px solid #E8552D;background:#FFFDF8;box-shadow:0 0 0 4px #FDEBE4;padding:0 14px;font:500 16px 'Space Grotesk',sans-serif;color:#1C1A17;outline:none;box-sizing:border-box;width:100%" />
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
+                <sc-for list="{{ storeSuggestions }}" as="q" hint-placeholder-count="4">
+                  <div onClick="{{ q.pick }}" style="padding:9px 13px;border-radius:999px;background:#EFEBE3;border:1px solid #E3DDD2;font:500 12.5px 'Space Grotesk',sans-serif;color:#1C1A17;cursor:pointer" style-hover="background:#E4DFD5">{{ q.label }}</div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px;padding-top:13px;border-top:1px dashed #D5CEC2">
+              <div style="font:500 10.5px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#9A9389">WHO PAID?</div>
+              <div style="display:flex;gap:7px;flex-wrap:wrap">
+                <sc-for list="{{ grocerPicker }}" as="g" hint-placeholder-count="6">
+                  <div onClick="{{ g.pick }}" style="display:flex;align-items:center;gap:7px;padding:5px 11px 5px 5px;border-radius:999px;background:{{ g.bg }};border:1px solid {{ g.bd }};cursor:pointer">
+                    <div style="width:22px;height:22px;border-radius:999px;background:{{ g.color }};color:#fff;display:flex;align-items:center;justify-content:center;font:600 10.5px 'Space Grotesk',sans-serif">{{ g.ini }}</div>
+                    <span style="font:500 12.5px 'Space Grotesk',sans-serif;color:#1C1A17">{{ g.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:baseline;gap:6px;font:400 11px 'JetBrains Mono',monospace;color:#B5AEA2;padding-top:4px;border-top:1px dotted #E3DDD2">
+              <span>ITEMS</span><span style="flex:1;border-bottom:1px dotted #E3DDD2"></span><span>PENDING SCAN</span>
+            </div>
+
+            <div onClick="{{ startNew }}" style="height:52px;border-radius:13px;background:{{ startBg }};color:#fff;display:flex;align-items:center;justify-content:center;font:600 16px 'Space Grotesk',sans-serif;cursor:pointer">{{ startLabel }}</div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ══ EDIT ITEM SHEET ══ -->
+    <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:90;background:rgba(28,26,23,.34);display:flex;align-items:flex-end">
+        <div onClick="{{ cancelEdit }}" style="position:absolute;inset:0;cursor:pointer"></div>
+        <div style="position:relative;width:100%;background:#EFEBE3;border-top-left-radius:22px;border-top-right-radius:22px;padding:18px 20px 34px;display:flex;flex-direction:column;gap:15px;animation:gsIn .24s ease both;box-shadow:0 -8px 30px rgba(28,26,23,.18)">
+          <div style="width:38px;height:4px;border-radius:999px;background:#D5CEC2;align-self:center"></div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <div style="font:600 18px 'Space Grotesk',sans-serif;color:#1C1A17">Edit item</div>
+            <div style="font:400 11px 'JetBrains Mono',monospace;color:#9A9389">{{ editMeta }}</div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font:500 12px 'Space Grotesk',sans-serif;color:#5C574F">Name</div>
+            <input value="{{ editName }}" onChange="{{ setEditName }}" placeholder="What is it?" style="height:50px;border-radius:12px;border:1.5px solid #E8552D;background:#FFFDF8;box-shadow:0 0 0 4px #FDEBE4;padding:0 14px;font:400 15px 'Space Grotesk',sans-serif;color:#1C1A17;outline:none;box-sizing:border-box;width:100%" />
+            <sc-if value="{{ hasGuess }}" hint-placeholder-val="{{ false }}">
+              <div onClick="{{ useGuess }}" style="align-self:flex-start;margin-top:2px;padding:8px 13px;border-radius:999px;background:#FDF3D6;border:1px solid #E8CE7A;font:500 12.5px 'Space Grotesk',sans-serif;color:#6E5500;cursor:pointer">Use AI guess: {{ editGuess }}</div>
+            </sc-if>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font:500 12px 'Space Grotesk',sans-serif;color:#5C574F">Price</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="flex:1;height:50px;border-radius:12px;border:1px solid #E3DDD2;background:#FFFDF8;display:flex;align-items:center;padding:0 14px;gap:6px">
+                <span style="font:500 15px 'JetBrains Mono',monospace;color:#9A9389">{{ cur }}</span>
+                <input value="{{ editPrice }}" onChange="{{ setEditPrice }}" style="flex:1;border:none;background:transparent;font:500 19px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:#1C1A17;outline:none;width:100%;padding:0" />
+              </div>
+              <div onClick="{{ editDown }}" style="width:50px;height:50px;border-radius:12px;background:#FFFDF8;border:1px solid #E3DDD2;display:flex;align-items:center;justify-content:center;font:400 22px 'Space Grotesk',sans-serif;color:#1C1A17;cursor:pointer" style-hover="background:#F4F0E8">−</div>
+              <div onClick="{{ editUp }}" style="width:50px;height:50px;border-radius:12px;background:#FFFDF8;border:1px solid #E3DDD2;display:flex;align-items:center;justify-content:center;font:400 22px 'Space Grotesk',sans-serif;color:#1C1A17;cursor:pointer" style-hover="background:#F4F0E8">+</div>
+            </div>
+          </div>
+
+          <sc-if value="{{ confirmDelete }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:2px;padding:15px;border-radius:14px;background:#FDEBE4;border:1px solid #E7C3B5;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <div style="font:600 15px 'Space Grotesk',sans-serif;color:#8F3418">Remove {{ editName }}?</div>
+                <div style="font:400 12.5px/1.45 'Space Grotesk',sans-serif;color:#A0543A;text-wrap:pretty">It comes off the receipt and everyone's share drops by {{ deleteImpact }}.</div>
+              </div>
+              <div style="display:flex;gap:10px">
+                <div onClick="{{ cancelDelete }}" style="flex:1;height:46px;border-radius:12px;background:#FFFDF8;border:1px solid #E7C3B5;display:flex;align-items:center;justify-content:center;font:600 15px 'Space Grotesk',sans-serif;color:#5C574F;cursor:pointer">Keep it</div>
+                <div onClick="{{ deleteItem }}" style="flex:1;height:46px;border-radius:12px;background:#B03A1B;color:#fff;display:flex;align-items:center;justify-content:center;font:600 15px 'Space Grotesk',sans-serif;cursor:pointer" style-hover="background:#963014">Remove</div>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ notConfirmDelete }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;gap:10px;margin-top:2px">
+              <div onClick="{{ askDelete }}" style="width:52px;height:50px;border-radius:13px;background:transparent;border:1px solid #E7C3B5;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#FDEBE4">
+                <svg width="17" height="19" viewBox="0 0 17 19" fill="none"><path d="M2.5 5h12M6.5 2.5h4M4 5l.9 11.2a1 1 0 001 .8h5.2a1 1 0 001-.8L14 5M7 8.5v5.5M10 8.5v5.5" stroke="#B03A1B" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </div>
+              <div onClick="{{ saveEdit }}" style="flex:1;height:50px;border-radius:13px;background:#E8552D;color:#fff;display:flex;align-items:center;justify-content:center;font:600 16px 'Space Grotesk',sans-serif;cursor:pointer" style-hover="background:#C4401C">Save</div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ══ TOAST ══ -->
+    <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:20px;right:20px;bottom:104px;z-index:80;display:flex;align-items:center;gap:11px;padding:13px 16px;border-radius:14px;background:#1C1A17;box-shadow:0 8px 24px rgba(28,26,23,.22);animation:gsIn .22s ease both">
+        <span style="color:#7FC49B;font:700 14px 'Space Grotesk',sans-serif">✓</span>
+        <span style="font:500 14px 'Space Grotesk',sans-serif;color:#FFFDF8;flex:1">{{ toast }}</span>
+      </div>
+    </sc-if>
+
+  </x-import>
+  <div onClick="{{ reset }}" style="padding:8px 16px;border-radius:999px;border:1px solid #D5CEC2;font:500 12px 'Space Grotesk',sans-serif;color:#5C574F;cursor:pointer" style-hover="background:#DCD6CB">Reset demo</div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:520,&quot;height&quot;:980},&quot;currency&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;$&quot;,&quot;£&quot;,&quot;€&quot;,&quot;RM&quot;,&quot;S$&quot;],&quot;default&quot;:&quot;$&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+class Component extends DCLogic {
+  MEMBERS = [
+    { id: 'ben', name: 'Ben', ini: 'B', color: '#E8552D', tag: 'YOU', handle: '@BENGUY' },
+    { id: 'aisha', name: 'Aisha', ini: 'A', color: '#3B7A57', tag: '', handle: '@AISHAK' },
+    { id: 'mira', name: 'Mira', ini: 'M', color: '#5C574F', tag: '', handle: '@MIRAW' },
+    { id: 'kai', name: 'Kai', ini: 'K', color: '#D9A400', tag: '', handle: '@KAIT' },
+    { id: 'theo', name: 'Théo', ini: 'T', color: '#8A6A4B', tag: '', handle: '@THEOL' },
+    { id: 'sam', name: 'Sam', ini: 'S', color: '#7A8B99', tag: '', handle: '@SAMP' },
+  ];
+  BASE = [
+    { id: 1, name: 'Oat milk 1L ×2', price: 8.58 },
+    { id: 2, name: 'Eggs, dozen', price: 5.99 },
+    { id: 3, name: 'SPCY CHKN SNDWCH', price: 6.5, flag: true, guess: 'Spicy chicken sandwich' },
+    { id: 4, name: 'Bananas, bunch', price: 2.19 },
+    { id: 5, name: 'Dish soap', price: 4.49 },
+    { id: 6, name: 'Protein powder', price: 29.9 },
+    { id: 7, name: 'Cold brew concentrate', price: 9.99 },
+    { id: 8, name: 'Frozen dumplings ×3', price: 11.97 },
+    { id: 9, name: 'Olive oil 750ml', price: 12.99 },
+    { id: 10, name: 'PPR TWL 6RL', price: 8.99, flag: true, guess: 'Paper towels, 6 roll' },
+    { id: 11, name: 'Greek yogurt tub', price: 6.49 },
+    { id: 12, name: 'Coffee beans 1kg', price: 18.5 },
+  ];
+  VOTES = [
+    { who: 'aisha', out: [6] },
+    { who: 'theo', out: [3, 8] },
+    { who: 'kai', out: [6, 12] },
+    { who: 'sam', out: [6, 7] },
+    { who: 'mira', out: [] },
+  ];
+  SCREENS = [
+    ['onboarding', 'ONBOARDING'], ['home', 'RECEIPTS'], ['scan', 'SCAN RECEIPT'],
+    ['review', 'LINE REVIEW'], ['manual', 'MANUAL ENTRY'], ['poll', 'POLL COMPOSER'],
+    ['live', 'POLL MONITOR'], ['confirm', 'THE SPLIT'], ['export', 'TRICOUNT EXPORT'],
+    ['history', 'HISTORY'], ['house', 'HOUSE'],
+  ];
+
+  state = {
+    screen: 'onboarding', items: null, selected: [6, 12],
+    scanning: false, sent: false, votes: [], closed: false, confirmed: false, taxOn: true, taxMode: 'pro',
+    toast: null, draftName: 'Kimchi 500g', draftPrice: '7.40',
+    editId: null, editName: '', editPrice: '', editGuess: '',
+    store: "Trader Joe's", storeDraft: '', newSheet: false, grocer: 'ben', grocerDraft: 'ben',
+  };
+  timers = [];
+
+  componentWillUnmount() { this.timers.forEach(clearTimeout); }
+  later(fn, ms) { this.timers.push(setTimeout(fn, ms)); }
+  cur() { return this.props.currency ?? '$'; }
+  fmt(n) { return this.cur() + n.toFixed(2); }
+  TAX_RATE = 0.09;
+  items() { return this.state.items || this.BASE; }
+  subtotal() { return this.items().reduce((s, i) => s + i.price, 0); }
+  tax() { return this.state.taxOn ? Math.round(this.subtotal() * this.TAX_RATE * 100) / 100 : 0; }
+  total() { return Math.round((this.subtotal() + this.tax()) * 100) / 100; }
+  totalCents() { return Math.round(this.total() * 100); }
+  PALETTE = ['#E8552D', '#3B7A57', '#5C574F', '#D9A400', '#8A6A4B', '#7A8B99', '#B0473F', '#4F6B8A'];
+  mem() {
+    const c = this.state.colors || {};
+    return this.MEMBERS.map(m => Object.assign({}, m, { color: c[m.id] || m.color }));
+  }
+  outsFor(id) {
+    if (!this.state.sent || !this.state.selected.includes(id)) return [];
+    const ids = this.state.votes.reduce((a, v) => a.concat(v.out.includes(id) ? [v.who] : []), []);
+    return ids.map(w => this.mem().find(m => m.id === w));
+  }
+  shares() {
+    const map = {};
+    this.MEMBERS.forEach(m => { map[m.id] = { amt: 0, n: 0, tax: 0 }; });
+    this.items().forEach(it => {
+      const out = this.outsFor(it.id).map(m => m.id);
+      const inn = this.MEMBERS.filter(m => !out.includes(m.id));
+      inn.forEach(m => { map[m.id].amt += it.price / inn.length; map[m.id].n += 1; });
+    });
+    const tax = this.tax(), sub = this.subtotal();
+    if (tax > 0) {
+      this.MEMBERS.forEach(m => {
+        const t = this.state.taxMode === 'even' ? tax / 6 : (sub ? map[m.id].amt / sub * tax : 0);
+        map[m.id].tax = Math.round(t * 100) / 100; map[m.id].amt += t;
+      });
+    }
+    // round to cents; the grocer absorbs the remainder so shares always sum to the total
+    const g = this.state.grocer;
+    let owedCents = 0;
+    this.MEMBERS.forEach(m => {
+      if (m.id === g) return;
+      const c = Math.round(map[m.id].amt * 100);
+      map[m.id].amt = c / 100; owedCents += c;
+    });
+    map[g].amt = (this.totalCents() - owedCents) / 100;
+    return map;
+  }
+  toast(msg) {
+    this.setState({ toast: msg });
+    this.later(() => this.setState({ toast: null }), 2200);
+  }
+  go(s) {
+    if (s === 'live' && !this.state.sent) {
+      this.setState({ screen: 'live', sent: true, votes: [] });
+      this.runVotes();
+      return;
+    }
+    this.setState({ screen: s });
+  }
+  bump(delta) {
+    const cents = Math.max(0, Math.round(parseFloat(this.state.draftPrice || '0') * 100) + delta);
+    this.setState({ draftPrice: (cents / 100).toFixed(2) });
+  }
+
+  openEdit(it) {
+    this.setState({ editId: it.id, editName: it.name, editPrice: it.price.toFixed(2), editGuess: it.guess || '', confirmDelete: false });
+  }
+  patchItem(id, patch) {
+    this.setState(s => ({ items: (s.items || this.BASE).map(x => x.id === id ? Object.assign({}, x, patch) : x) }));
+  }
+  saveEdit = () => {
+    const st = this.state, p = parseFloat(st.editPrice);
+    this.patchItem(st.editId, { name: (st.editName || '').trim() || 'Untitled item', price: isNaN(p) ? 0 : p, flag: false });
+    this.setState({ editId: null, confirmDelete: false });
+    this.toast('Item updated');
+  };
+  capture = () => {
+    if (this.state.scanning) return;
+    this.setState({ scanning: true });
+    this.later(() => this.setState({ scanning: false, screen: 'review', items: this.BASE.slice() }), 1900);
+  };
+  runVotes() {
+    this.VOTES.forEach((v, i) => this.later(() => {
+      this.setState(s => (s.votes.find(x => x.who === v.who) ? null : { votes: s.votes.concat([v]) }));
+    }, 900 + i * 1100));
+    this.later(() => {
+      if (this.state.screen === 'live' && this.state.votes.length >= 5) this.setState({ closed: true, screen: 'confirm' });
+    }, 900 + this.VOTES.length * 1100 + 1500);
+  }
+  sendPoll = () => {
+    if (!this.state.selected.length) return;
+    this.setState({ screen: 'live', sent: true, votes: [], closed: false });
+    this.runVotes();
+  };
+  reset = () => {
+    this.timers.forEach(clearTimeout); this.timers = [];
+    this.setState({ screen: 'onboarding', items: null, selected: [6, 12], scanning: false, sent: false, votes: [], closed: false, confirmed: false, toast: null, taxOn: true, taxMode: 'pro', editId: null, store: "Trader Joe's", storeDraft: '', newSheet: false, grocer: 'ben', grocerDraft: 'ben' });
+  };
+
+  renderVals() {
+    const st = this.state, total = this.total(), items = this.items();
+    const flags = items.filter(i => i.flag);
+    const sh = this.shares();
+    const votedCount = st.votes.length;
+    const allIn = votedCount >= 5;
+
+    const nav = this.SCREENS.map(([id, label], i) => ({
+      num: String(i + 1).padStart(2, '0'), label,
+      bg: st.screen === id ? '#1C1A17' : 'transparent',
+      color: st.screen === id ? '#FFFDF8' : '#1C1A17',
+      numColor: st.screen === id ? '#E8552D' : '#B5AEA2',
+      go: () => this.go(id),
+    }));
+
+    const reviewRows = items.map(it => {
+      const f = !!it.flag;
+      return {
+        id: it.id, name: it.name, priceStr: this.fmt(it.price),
+        sub: f ? 'AI UNSURE · TAP TO FIX THE NAME' : 'SPLIT 6 WAYS · ' + this.fmt(it.price / 6) + ' EA',
+        mark: f ? '?' : '✓',
+        bg: f ? '#FFFDF8' : '#FFFDF8', bd: f ? '#E8CE7A' : '#E3DDD2', edge: f ? '#D9A400' : '#E3DDD2',
+        boxBg: f ? '#FDF3D6' : '#E8552D', boxColor: f ? '#8A6A00' : '#FFFFFF', boxBd: f ? '#E8CE7A' : '#E8552D',
+        nameColor: '#1C1A17', strike: 'none', subColor: f ? '#8A6A00' : '#9A9389', priceColor: '#1C1A17',
+        onTap: () => this.openEdit(it),
+        onEdit: () => this.openEdit(it),
+      };
+    });
+
+    const pollRows = items.map(it => {
+      const sel = st.selected.includes(it.id);
+      return {
+        id: it.id, name: it.name, priceStr: this.fmt(it.price), mark: sel ? '✓' : '',
+        bg: sel ? '#FDEBE4' : '#FFFDF8', bd: sel ? '#E8552D' : '#E3DDD2',
+        boxBg: sel ? '#E8552D' : 'transparent', boxBd: sel ? '#E8552D' : '#DDD6CA',
+        onTap: () => this.setState(s => ({ selected: s.selected.includes(it.id) ? s.selected.filter(x => x !== it.id) : s.selected.concat([it.id]) })),
+      };
+    });
+
+    const liveRows = items.filter(i => st.selected.includes(i.id)).map(it => {
+      const outs = this.outsFor(it.id);
+      const n = 6 - outs.length;
+      return {
+        name: it.name, priceStr: this.fmt(it.price),
+        outs: outs.map(m => ({ ini: m.ini, color: m.color })),
+        note: outs.length ? outs.map(m => m.name).join(', ') + ' out' : 'everyone still in',
+        noteColor: outs.length ? '#8F3418' : '#9A9389',
+        eachStr: this.fmt(it.price / n),
+      };
+    });
+
+    const voterChips = this.mem().filter(m => m.id !== st.grocer).map(m => {
+      const v = st.votes.find(x => x.who === m.id);
+      const n = v ? v.out.filter(id => st.selected.includes(id)).length : 0;
+      return {
+        ini: m.ini, avatar: v ? m.color : '#C9C1B4',
+        bg: v ? '#FFFDF8' : '#F1EDE5', bd: v ? '#E3DDD2' : '#E7E2D9',
+        label: v ? (n ? n + ' OUT' : 'ALL IN') : '…',
+        labelColor: v ? '#5C574F' : '#B5AEA2',
+      };
+    });
+
+    const splitRows = this.mem().map(m => ({
+      name: m.id === 'ben' ? 'Ben (you)' : m.name,
+      nameUpper: m.name.toUpperCase() + (m.id === 'ben' ? ' (YOU)' : ''),
+      ini: m.ini, color: m.color, isGrocer: m.id === st.grocer,
+      detail: m.id === st.grocer
+        ? 'PAID ' + this.fmt(total) + ' · KEEPS THE ROUNDING'
+        : sh[m.id].n + ' OF ' + items.length + ' ITEMS' + (st.taxOn ? ' · +' + this.fmt(sh[m.id].tax) + ' TAX' : ''),
+      amountStr: this.fmt(sh[m.id].amt),
+      amountColor: m.id === st.grocer ? '#9A9389' : '#1C1A17',
+      copy: () => this.toast('Copied ' + this.fmt(sh[m.id].amt) + ' — ' + m.name),
+    }));
+
+    const owed = total - sh[st.grocer].amt;
+
+    return {
+      nav, reset: this.reset,
+      store: st.store, storeUpper: (st.store || '').toUpperCase(),
+      grocerUpper: ((this.mem().find(m => m.id === st.grocer) || {}).name || '').toUpperCase(),
+      reviewMeta: (st.store || '').toUpperCase() + ' · SCANNED 12S AGO',
+      exportMeta: 'LOCKED · ' + (st.store || '').toUpperCase() + ' · TODAY',
+      tricountTitle: st.store + ' · 29 Aug',
+      newSheet: !!st.newSheet, storeDraft: st.storeDraft || '',
+      todayStr: '29 AUG 2026 · 19:42',
+      setStore: (e) => this.setState({ storeDraft: e.target.value }),
+      storeSuggestions: ["Trader Joe's", 'Whole Foods', 'Safeway', 'Costco', 'Kroger', 'Target'].map(n => ({
+        label: n, pick: () => this.setState({ storeDraft: n }),
+      })),
+      openNew: () => this.setState({ newSheet: true, storeDraft: '' }),
+      closeNew: () => this.setState({ newSheet: false }),
+      startLabel: (st.storeDraft || '').trim() ? 'Line up the receipt →' : 'Name the shop first',
+      startBg: (st.storeDraft || '').trim() ? '#E8552D' : '#F1C3B2',
+      startNew: () => {
+        const name = (st.storeDraft || '').trim();
+        if (!name) return;
+        this.setState({ store: name, grocer: this.state.grocerDraft || 'ben', newSheet: false, screen: 'scan', items: null, sent: false, votes: [], confirmed: false });
+      },
+      flow: [['review', 'REVIEW'], ['poll', 'POLL'], ['live', 'VOTES'], ['confirm', 'SPLIT'], ['export', 'EXPORT']].map(([id, label], i) => {
+        const order = ['review', 'poll', 'live', 'confirm', 'export'];
+        const at = order.indexOf(st.screen);
+        const done = at > i, now = at === i;
+        const reachable = done || now || i <= at + 1 || (id === 'confirm' && at >= 0) || (id === 'export' && st.confirmed);
+        return {
+          label, bar: now ? '#E8552D' : done ? '#1C1A17' : '#DDD6CA',
+          color: now ? '#E8552D' : done ? '#5C574F' : '#B5AEA2',
+          go: () => { if (reachable) this.go(id); else this.toast('Finish the split first'); },
+        };
+      }),
+      allSelected: st.selected.length === items.length,
+      selectAllLabel: st.selected.length === items.length ? 'CLEAR ALL' : 'SELECT ALL',
+      toggleSelectAll: () => this.setState(s => ({ selected: s.selected.length === items.length ? [] : items.map(i => i.id) })),
+      members: this.mem().map(m => Object.assign({}, m, {
+        openColor: () => this.setState(s2 => ({ colorFor: s2.colorFor === m.id ? null : m.id })),
+        editing: (st.colorFor === m.id),
+        swatches: this.PALETTE.map(hex => ({
+          hex, ring: (m.color === hex ? '#1C1A17' : 'transparent'),
+          pick: () => this.setState(s2 => ({ colors: Object.assign({}, s2.colors, { [m.id]: hex }), colorFor: null })),
+        })),
+      })),
+      isOnboarding: st.screen === 'onboarding', isHome: st.screen === 'home', isScan: st.screen === 'scan',
+      isReview: st.screen === 'review', isManual: st.screen === 'manual', isPoll: st.screen === 'poll',
+      isLive: st.screen === 'live', isConfirm: st.screen === 'confirm', isExport: st.screen === 'export',
+      isHistory: st.screen === 'history', isHouse: st.screen === 'house',
+      cur: this.cur(), toast: st.toast,
+      totalStr: this.fmt(total), itemCount: items.length,
+      evenShareStr: this.fmt(Math.round(this.totalCents() / 6) / 100),
+      subtotalStr: this.fmt(this.subtotal()),
+      taxStr: this.fmt(this.tax()),
+      taxOn: st.taxOn,
+      taxRowNote: st.taxOn ? 'READ OFF RECEIPT · GST 9%' : 'NOT SPLIT · GROCER ABSORBS IT',
+      taxToggleBg: st.taxOn ? '#3B7A57' : '#DDD6CA',
+      taxToggleJustify: st.taxOn ? 'flex-end' : 'flex-start',
+      toggleTax: () => this.setState(s => ({ taxOn: !s.taxOn })),
+      taxProBg: st.taxMode === 'pro' ? '#FFFDF8' : 'transparent',
+      taxProColor: st.taxMode === 'pro' ? '#1C1A17' : '#5C574F',
+      taxEvenBg: st.taxMode === 'even' ? '#FFFDF8' : 'transparent',
+      taxEvenColor: st.taxMode === 'even' ? '#1C1A17' : '#5C574F',
+      setTaxPro: () => this.setState({ taxMode: 'pro' }),
+      setTaxEven: () => this.setState({ taxMode: 'even' }),
+      taxLine: st.taxOn ? 'TAX ' + this.fmt(this.tax()) + (st.taxMode === 'even' ? ' · 6 WAYS' : ' · BY SHARE') : 'TAX NOT SPLIT',
+      taxModeNote: st.taxMode === 'even' ? this.fmt(this.tax() / 6) + ' of tax each, flat.' : 'Tax follows what each person actually owes.',
+      hasFlags: flags.length > 0, flagCount: flags.length,
+      flagLabel: flags.length === 1 ? "1 name the AI wasn't sure about" : flags.length + " names the AI wasn't sure about",
+      editing: !!st.editId,
+      editName: st.editName || '', editPrice: st.editPrice || '',
+      editGuess: st.editGuess || '', hasGuess: !!st.editGuess,
+      editMeta: st.editGuess ? 'AI WASN\u2019T SURE' : 'FROM RECEIPT',
+      setEditName: (e) => this.setState({ editName: e.target.value }),
+      setEditPrice: (e) => this.setState({ editPrice: e.target.value.replace(/[^0-9.]/g, '') }),
+      useGuess: () => this.setState({ editName: st.editGuess }),
+      editUp: () => this.setState({ editPrice: (Math.max(0, (parseFloat(st.editPrice) || 0) + 0.1)).toFixed(2) }),
+      editDown: () => this.setState({ editPrice: (Math.max(0, (parseFloat(st.editPrice) || 0) - 0.1)).toFixed(2) }),
+      saveEdit: this.saveEdit,
+      cancelEdit: () => this.setState({ editId: null, confirmDelete: false }),
+      confirmDelete: !!st.confirmDelete, notConfirmDelete: !st.confirmDelete,
+      askDelete: () => this.setState({ confirmDelete: true }),
+      cancelDelete: () => this.setState({ confirmDelete: false }),
+      deleteImpact: this.fmt(((parseFloat(st.editPrice) || 0) / 6) * (st.taxOn ? 1 + this.TAX_RATE : 1)),
+      deleteItem: () => {
+        this.setState(s => ({ items: (s.items || this.BASE).filter(x => x.id !== s.editId), editId: null, confirmDelete: false }));
+        this.toast('Item removed');
+      },
+      fixAll: () => this.setState(s => ({ items: (s.items || this.BASE).map(x => x.flag ? { id: x.id, name: x.guess, price: x.price } : x) })),
+
+      statusLabel: st.confirmed ? 'LOCKED' : st.sent ? 'POLL OPEN' : 'NEEDS REVIEW',
+      statusBg: st.confirmed ? '#E7F1EA' : st.sent ? '#FDF3D6' : '#FDEBE4',
+      statusColor: st.confirmed ? '#2F6246' : st.sent ? '#8A6A00' : '#8F3418',
+      statusHint: st.confirmed ? 'Ready to copy into Tricount' : st.sent ? votedCount + ' of 5 housemates have voted' : 'Check the AI read it right',
+      openCurrent: () => this.go(st.confirmed ? 'export' : st.sent ? 'live' : 'review'),
+
+      scanning: st.scanning,
+      scanLabel: st.scanning ? 'READING RECEIPT…' : 'LINE UP THE RECEIPT',
+      scanHint: st.scanning ? 'Finding items, prices and tax' : 'Flat surface, all lines visible. Long receipts are fine — just keep scrolling.',
+      capture: this.capture,
+
+      reviewRows, pollRows, liveRows, voterChips, splitRows,
+      exportRows: splitRows.filter(r => !r.isGrocer),
+      pollCount: st.selected.length,
+      pollPreview: items.filter(i => st.selected.includes(i.id)).map(i => ({ label: i.name + ' — ' + this.fmt(i.price) })),
+      sendPoll: this.sendPoll,
+
+      votedCount,
+      liveFooter: allIn ? 'Everyone voted — opening the split…' : 'Waiting on ' + (5 - votedCount) + ' of 5. Anyone who never votes stays in.',
+      closeLabel: allIn ? 'See the split' : 'Close poll early · ' + votedCount + '/5 in',
+      closeBg: allIn ? '#E8552D' : '#1C1A17',
+      closePoll: () => this.setState({ closed: true, screen: 'confirm' }),
+
+      confirmMeta: st.sent ? votedCount + ' VOTED · ' + st.selected.length + ' ITEMS POLLED' : 'NO POLL · EVERYONE IN ON ALL ' + items.length,
+      owedSummary: 'Owed back by 5 housemates: ' + this.fmt(owed),
+      grocerName: (this.mem().find(m => m.id === st.grocer) || {}).name,
+      grocerPaidLabel: (st.grocer === 'ben' ? 'YOU PAID' : ((this.mem().find(m => m.id === st.grocer) || {}).name || '').toUpperCase() + ' PAID'),
+      lockNote: st.grocer === 'ben'
+        ? 'Only you can lock this — you did the shopping.'
+        : 'Only ' + (this.mem().find(m => m.id === st.grocer) || {}).name + ' can lock this — they did the shopping.',
+      grocerPicker: this.mem().map(m => ({
+        label: m.id === 'ben' ? 'You' : m.name, color: m.color, ini: m.ini,
+        bg: st.grocerDraft === m.id ? '#FDEBE4' : '#EFEBE3',
+        bd: st.grocerDraft === m.id ? '#E8552D' : '#E3DDD2',
+        pick: () => this.setState({ grocerDraft: m.id }),
+      })),
+      backFromConfirm: () => this.go('home'),
+      postLabel: st.selected.length ? 'Post poll to @blk42food' : 'Pick at least one item',
+      postBg: st.selected.length ? '#E8552D' : '#F1C3B2',
+      lockBg: st.grocer === 'ben' ? '#3B7A57' : '#C4CFC6',
+      lockCursor: st.grocer === 'ben' ? 'pointer' : 'default',
+      lockMark: st.grocer === 'ben' ? '✓' : '⏳',
+      lockLabel: st.grocer === 'ben' ? 'Confirm & lock split' : 'Waiting on ' + ((this.mem().find(m => m.id === st.grocer) || {}).name || '') + ' to confirm',
+      confirmSplit: () => {
+        if (st.grocer !== 'ben') { this.toast('Only the grocer can lock the split'); return; }
+        this.setState({ confirmed: true, screen: 'export' });
+        this.toast('Split locked — nobody can change it now');
+      },
+
+      copyAll: () => this.toast('All 5 amounts copied'),
+      exportCsv: () => this.toast('grosplit-29aug.csv saved'),
+      finish: () => this.go('home'),
+
+      draftName: st.draftName, draftPrice: st.draftPrice,
+      quickNames: ['Kimchi 500g', 'Rice 5kg', 'Chicken thigh', 'Trash bags', 'Sriracha'].map(n => ({
+        label: n, pick: () => this.setState({ draftName: n }),
+      })),
+      keypad: [['−1.00', -100], ['−0.10', -10], ['−0.01', -1], ['+0.01', 1], ['+0.10', 10], ['+1.00', 100]]
+        .map(([label, d]) => ({ label, tap: () => this.bump(d) })),
+      addDraft: () => {
+        const p = parseFloat(st.draftPrice) || 0;
+        this.setState(s => ({ items: (s.items || this.BASE).concat([{ id: Date.now(), name: s.draftName, price: p }]), screen: 'review' }));
+        this.toast(st.draftName + ' added');
+      },
+
+      history: [
+        { store: st.store, meta: 'TODAY · ' + items.length + ' ITEMS', total: this.fmt(total), each: this.fmt(Math.round(this.totalCents() / 6) / 100), ini: 'B', color: '#E8552D' },
+        { store: 'Safeway', meta: '25 AUG · 9 ITEMS', total: '$61.20', each: '$10.20', ini: 'M', color: '#5C574F' },
+        { store: 'Whole Foods', meta: '21 AUG · 14 ITEMS', total: '$88.40', each: '$14.73', ini: 'A', color: '#3B7A57' },
+        { store: 'Costco', meta: '17 AUG · 6 ITEMS', total: '$42.05', each: '$7.01', ini: 'K', color: '#D9A400' },
+        { store: 'Target', meta: '12 AUG · 19 ITEMS', total: '$103.90', each: '$17.32', ini: 'T', color: '#8A6A4B' },
+        { store: "Trader Joe's", meta: '05 AUG · 11 ITEMS', total: '$74.60', each: '$12.43', ini: 'S', color: '#7A8B99' },
+      ],
+      shopStats: [
+        { name: 'Ben', pct: '82%', n: '9', color: '#E8552D' },
+        { name: 'Mira', pct: '55%', n: '6', color: '#5C574F' },
+        { name: 'Aisha', pct: '36%', n: '4', color: '#3B7A57' },
+        { name: 'Kai', pct: '18%', n: '2', color: '#D9A400' },
+      ],
+
+      goHome: () => this.go('home'), goScan: () => this.go('scan'), goReview: () => this.go('review'),
+      goManual: () => this.go('manual'), goPoll: () => this.go('poll'), goLive: () => this.go('live'),
+      goConfirm: () => this.go('confirm'), goHistory: () => this.go('history'), goHouse: () => this.go('house'),
+    };
+  }
+}
+</script>
+</body>
+</html>

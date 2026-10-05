@@ -1,0 +1,33 @@
+# `app` must be globally unique on Fly — it becomes https://<app>.fly.dev,
+# which is the Mini App URL you give BotFather. Change it if this is taken.
+app = "grosplit-blk42"
+primary_region = "sin"
+
+[build]
+
+[env]
+  DATABASE_PATH = "/data/grosplit.db"
+  PORT = "3000"
+
+# SQLite needs a real disk. `fly volumes create grosplit_data --size 1`
+[mounts]
+  source = "grosplit_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+
+  # Scale to zero. A household shops a few times a week, so paying for an
+  # idle machine 24/7 buys nothing. Both things that must reach us — the
+  # Telegram webhook and the Mini App itself — are HTTP requests, and those
+  # wake a stopped machine. Expired polls close lazily on the next read
+  # rather than on a timer, so nothing depends on staying up.
+  # Cost: the volume, plus the seconds the machine actually runs.
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

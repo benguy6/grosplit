@@ -1,0 +1,17 @@
+node_modules/
+.env
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+uploads/
+.DS_Store
+.shots/
+.env.*
+!.env.example
+
+# scratch output from local runs
+*.log
+*.err
+.polltest.js
+.verify.js

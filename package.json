@@ -1,0 +1,14 @@
+{
+  "name": "grosplit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Splits grocery bills for one household. Telegram Mini App.",
+  "main": "server.js",
+  "engines": { "node": ">=22.5.0" },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --env-file-if-exists=.env --watch server.js",
+    "demo": "node --env-file=demo.env server.js",
+    "test": "node --test"
+  }
+}
