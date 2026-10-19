@@ -241,7 +241,7 @@ original review.
 - [x] **B38** (P3) An object/array in `quantity` or `aiGuess` gives a 500. → Coerce to number/string or null.
 
 ### Found by the pre-push adversarial test (verdict PASS)
-- [ ] **B39** (P2) B32 still slips when SQLite reuses a freed item id (delete the highest line, add another): the id set looks unchanged, so a stale screen can overwrite the new line. → `receipt.items_version` bumped on every item write, sent back by the client; mismatch = 409 stale.
+- [x] **B39** (P2) B32 still slips when SQLite reuses a freed item id (delete the highest line, add another): the id set looks unchanged, so a stale screen can overwrite the new line. → `receipt.items_version` bumped on every item write, sent back by the client; mismatch = 409 stale.
 - [ ] **B40** (P3) Every toast shows a ✓, including errors ("✓ Someone else just changed this receipt"). → `toast(msg, kind)`, no check for errors.
 
 ### Found in live testing on the phone
@@ -286,9 +286,13 @@ original review.
 - [x] **B61b** (P3) The house is created on the bot-REMOVED event (my_chat_member member→left), and the greeting is attempted while kicked.
 
 ### Found by the F2 follow-up gate (verdict PASS) — fixes in progress
-- [ ] **B64** (P2, money; root of B39) SQLite reuses the highest item id after a delete, so an edit sheet left open across someone else's delete+add overwrites a DIFFERENT line (price included), and knownIds can't tell. → item.id AUTOINCREMENT (table-rebuild migration) so ids are never reused.
-- [ ] **B65** (P2, cost) The daily lookup cap counts cache rows, not calls: renames and failed retries bypass it. A typo in LOOKUP_DAILY_CAP removes it. → Count calls in their own table; validate the env value.
-- [ ] **B66** (P3) Editing a line someone else deleted says "Item updated"; a second receipt with a code already being looked up never gets the label; per-receipt cap resets on every restart.
+- [x] **B64** (P2, money; root of B39) SQLite reuses the highest item id after a delete, so an edit sheet left open across someone else's delete+add overwrites a DIFFERENT line (price included), and knownIds can't tell. → item.id AUTOINCREMENT (table-rebuild migration) so ids are never reused.
+- [x] **B65** (P2, cost) The daily lookup cap counts cache rows, not calls: renames and failed retries bypass it. A typo in LOOKUP_DAILY_CAP removes it. → Count calls in their own table; validate the env value.
+- [x] **B66** (P3) Editing a line someone else deleted says "Item updated"; a second receipt with a code already being looked up never gets the label; per-receipt cap resets on every restart.
+
+### Found by the B64 gate (verdict PASS)
+- [ ] **B67** (P2) The item rebuild runs foreign_key_check over the WHOLE DB and throws on any orphan, so one orphaned row anywhere = the app never boots (crash loop). Live DB checked clean (0 violations) before deploy. → Check only polled_item/opt_out, or roll back and keep running on the old schema.
+- [ ] **B68** (P3) A line waiting on another receipt's lookup doesn't add to its own receipt's pending count, so that Review screen doesn't poll for the label.
 
 ### P3: housekeeping
 - [x] **B20** No commits yet. → First commit pushed to github.com/benguy6/grosplit (private).

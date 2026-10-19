@@ -25,7 +25,7 @@ after(() => {
   db.close();
   for (const s of ['', '-wal', '-shm']) fs.rmSync(TMP + s, { force: true, maxRetries: 5, retryDelay: 100 });
 });
-beforeEach(() => { db.exec('DELETE FROM product_lookup'); console.log = () => {}; });
+beforeEach(() => { db.exec('DELETE FROM product_lookup; DELETE FROM lookup_call'); console.log = () => {}; });
 afterEach(() => { console.log = realLog; });
 
 const mk = (store, rows) => {
@@ -303,6 +303,10 @@ test('B61a: a code already being looked up is not paid for again by a rescan or 
   release();
   await lookup.whenIdle();
   assert.equal(calls.length, 2, 'one lookup = decode + web, once');
+  // B66: the lines that waited on it get the answer too (the other receipt, and the rescan).
+  assert.equal(d.items(db, b)[0].ai_guess, BUTTER);
+  assert.equal(d.items(db, a)[0].ai_guess, BUTTER);
+  assert.equal(d.items(db, b)[0].name, 'KS U/S QTRS', 'name untouched');
 });
 
 test('B61b: pending counts add up across scans instead of being overwritten', async () => {
@@ -371,4 +375,108 @@ test('B62: a cache hit does not flag a line the reader was happy with', () => {
   assert.equal(plain.ai_guess, 'Kirkland butter');
   assert.equal(plain.ai_flagged, 0, 'stays unflagged');
   assert.equal(flagged.ai_flagged, 1);
+});
+
+test('B65: the daily cap counts paid CALLS, so renames and cache edits cannot hide spending', async () => {
+  process.env.LOOKUP_DAILY_CAP = '4';
+  try {
+    stubFetch(good);
+    const id = mk('Costco', [line('A', '1'), line('B', '2'), line('C', '3')]);
+    assert.equal(lookup.afterScan(db, id, opts).sent, 2);
+    await lookup.whenIdle();
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM lookup_call').get().n, 4, 'decode + web per lookup');
+    db.exec('DELETE FROM product_lookup'); // what a rename does to the cache
+    const id2 = mk('Costco', [line('D', '4')]);
+    assert.equal(lookup.afterScan(db, id2, opts).sent, 0, 'still over budget');
+    // Rows older than 2 days are pruned when a call is next recorded; older-than-24h don't count.
+    db.exec('UPDATE lookup_call SET at = at - 200000');
+    const id3 = mk('Costco', [line('E', '5')]);
+    assert.equal(lookup.afterScan(db, id3, opts).sent, 1);
+    await lookup.whenIdle();
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM lookup_call').get().n, 2, 'old rows pruned');
+  } finally { delete process.env.LOOKUP_DAILY_CAP; }
+});
+
+test('B65: the cap is checked before each call, mid-lookup', async () => {
+  process.env.LOOKUP_DAILY_CAP = '1'; // room for the decode, not the web call
+  try {
+    const calls = stubFetch(good);
+    // budget 0 lookups at cap 1, so call fetchLabel directly with the same hook afterScan uses
+    const { fetchLabel } = lookup;
+    db.exec('DELETE FROM lookup_call');
+    let n = 0;
+    const out = await fetchLabel({ store: 'Costco', code: '1', printed: 'KS U/S QTRS' }, {
+      apiKey: 'k', beforeCall: () => { if (n++ >= 1) throw new Error('cap'); },
+    });
+    assert.equal(calls.length, 1, 'only the decode went out');
+    assert.equal(out.source, 'decoded');
+  } finally { delete process.env.LOOKUP_DAILY_CAP; }
+});
+
+test('B65: LOOKUP_DAILY_CAP parsing falls back to 100 for junk, allows 0', () => {
+  const was = process.env.LOOKUP_DAILY_CAP;
+  try {
+    for (const [v, want] of [[undefined, 100], ['', 100], ['abc', 100], ['-5', 100], ['NaN', 100], ['0', 0], ['7', 7]]) {
+      if (v === undefined) delete process.env.LOOKUP_DAILY_CAP; else process.env.LOOKUP_DAILY_CAP = v;
+      assert.equal(lookup.dailyCap(), want, String(v));
+    }
+  } finally { if (was === undefined) delete process.env.LOOKUP_DAILY_CAP; else process.env.LOOKUP_DAILY_CAP = was; }
+});
+
+test('B64: item ids are never reused (AUTOINCREMENT)', () => {
+  const id = mk('Costco', [line('A', null), line('B', null)]);
+  const [, b] = d.items(db, id);
+  db.prepare('DELETE FROM item WHERE id = ?').run(b.id);
+  d.syncItems(db, id, [...d.items(db, id).map((i) => ({ id: i.id, name: i.name, priceCents: i.price_cents })), { name: 'C', priceCents: 1 }], d.items(db, id).map((i) => i.id));
+  const c = d.items(db, id).at(-1);
+  assert.ok(c.id > b.id, 'the freed id is not handed out again');
+});
+
+test('B64 migration: an old (non-AUTOINCREMENT) database is rebuilt in place, keeping every row and its cascades', () => {
+  const p = path.join(os.tmpdir(), 'grosplit-b64-' + process.pid + '.db');
+  const { DatabaseSync } = require('node:sqlite');
+  const old = new DatabaseSync(p);
+  // The pre-fix shape: identical, but item.id is a plain INTEGER PRIMARY KEY.
+  old.exec(d.SCHEMA.replace('id          INTEGER PRIMARY KEY AUTOINCREMENT,', 'id          INTEGER PRIMARY KEY,'));
+  assert.ok(!/AUTOINCREMENT/i.test(old.prepare("SELECT sql FROM sqlite_master WHERE name = 'item'").get().sql));
+  old.exec(`
+    INSERT INTO household (id, name) VALUES (1, 'h');
+    INSERT INTO member (id, household_id, name, initial, avatar_color) VALUES (1, 1, 'A', 'A', '#000'), (2, 1, 'B', 'B', '#111');
+    INSERT INTO receipt (id, household_id, store, created_at, grocer_id, status, locked_split, poll_closes_at)
+      VALUES (1, 1, 'polled', 0, 1, 'polling', NULL, 9999999999), (2, 1, 'locked', 0, 1, 'confirmed', '{"memberIds":[1,2],"split":{"subtotalCents":300,"taxCents":0,"totalCents":300,"owedCents":0,"shares":{"1":{"cents":300,"taxCents":0,"itemCount":1},"2":{"cents":0,"taxCents":0,"itemCount":0}}}}', NULL);
+    INSERT INTO item (id, receipt_id, name, price_cents, item_code) VALUES (10, 1, 'a', 100, '111'), (11, 1, 'b', 200, NULL), (12, 2, 'c', 300, NULL);
+    INSERT INTO poll (id, receipt_id, part, telegram_poll_id, message_id) VALUES (1, 1, 1, 'tp', 5);
+    INSERT INTO polled_item (receipt_id, item_id, option_index, poll_id) VALUES (1, 10, 0, 1), (1, 11, 1, 1);
+    INSERT INTO opt_out VALUES (1, 10, 2), (1, 11, 2);
+    INSERT INTO poll_voter VALUES (1, 2, 5);
+  `);
+  old.close();
+  for (let pass = 0; pass < 2; pass++) { // second open: idempotent
+    const m = d.open(p);
+    assert.match(m.prepare("SELECT sql FROM sqlite_master WHERE name = 'item'").get().sql, /AUTOINCREMENT/i);
+    assert.equal(m.prepare('PRAGMA foreign_keys').get().foreign_keys, 1, 'foreign keys back ON');
+    assert.deepEqual(m.prepare('PRAGMA foreign_key_check').all(), []);
+    assert.deepEqual(m.prepare('SELECT id, receipt_id, name, price_cents, item_code FROM item ORDER BY id').all().map((r) => ({ ...r })), [
+      { id: 10, receipt_id: 1, name: 'a', price_cents: 100, item_code: '111' },
+      { id: 11, receipt_id: 1, name: 'b', price_cents: 200, item_code: null },
+      { id: 12, receipt_id: 2, name: 'c', price_cents: 300, item_code: null },
+    ]);
+    assert.equal(m.prepare('SELECT COUNT(*) n FROM opt_out').get().n, 2, 'children survived the rebuild');
+    assert.equal(m.prepare('SELECT COUNT(*) n FROM polled_item').get().n, 2);
+    assert.equal(m.prepare('SELECT COUNT(*) n FROM poll_voter').get().n, 1);
+    assert.ok(JSON.parse(m.prepare('SELECT locked_split FROM receipt WHERE id = 2').get().locked_split).split.totalCents === 300, 'locked split untouched');
+    assert.ok(m.prepare('SELECT 1 FROM sqlite_master WHERE name = ?').get('idx_item_receipt'));
+    m.close();
+  }
+  const m = d.open(p);
+  // The cascades still work through the renamed table.
+  m.prepare('DELETE FROM item WHERE id = 11').run();
+  assert.deepEqual(m.prepare('SELECT item_id FROM opt_out').all().map((r) => r.item_id), [10]);
+  assert.deepEqual(m.prepare('SELECT item_id FROM polled_item').all().map((r) => r.item_id), [10]);
+  // The original bug: delete the highest id, add a line -> a fresh id, never 12 again.
+  m.prepare('DELETE FROM item WHERE id = 12').run();
+  const ins = m.prepare("INSERT INTO item (receipt_id, name, price_cents) VALUES (2, 'new', 1)").run();
+  assert.ok(Number(ins.lastInsertRowid) > 12, 'ids are not reused: ' + ins.lastInsertRowid);
+  m.close();
+  for (const s of ['', '-wal', '-shm']) fs.rmSync(p + s, { force: true, maxRetries: 5, retryDelay: 100 });
 });

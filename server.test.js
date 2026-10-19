@@ -1221,3 +1221,24 @@ test('B61b: the bot being removed from a group never creates, links or greets', 
     assert.equal(replies.length, 0);
   });
 });
+
+test('B64: after delete-highest + add, a stale PUT carrying the old id gets 409 and nothing is overwritten', async () => {
+  const { id, items } = await mkReceipt('B64 Mart', [{ name: 'eggs', priceCents: 650 }, { name: 'milk', priceCents: 200 }]);
+  const [eggs, milk] = items;
+  // A deletes the highest line (milk) and adds steak.
+  const a = await api('PUT', `/api/receipt/${id}/items`, {
+    items: [{ id: eggs.id, name: 'eggs', priceCents: 650 }], knownIds: [eggs.id, milk.id],
+  });
+  assert.equal(a.status, 200);
+  const a2 = await api('PUT', `/api/receipt/${id}/items`, {
+    items: [{ id: eggs.id, name: 'eggs', priceCents: 650 }, { name: 'steak', priceCents: 1999 }], knownIds: [eggs.id],
+  });
+  const steak = a2.body.items.find((i) => i.name === 'steak');
+  assert.notEqual(steak.id, milk.id, 'the freed id is not reused');
+  // B's sheet was opened before all that: it still shows milk (old id) and edits it.
+  const b = await api('PUT', `/api/receipt/${id}/items`, {
+    items: [{ id: eggs.id, name: 'eggs', priceCents: 650 }, { id: milk.id, name: 'milk (2)', priceCents: 250 }], knownIds: [eggs.id, milk.id],
+  });
+  assert.equal(b.status, 409);
+  assert.equal(d.items(db, id).find((i) => i.id === steak.id).name, 'steak');
+});

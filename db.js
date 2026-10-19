@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS receipt (
 );
 
 CREATE TABLE IF NOT EXISTS item (
-  id          INTEGER PRIMARY KEY,
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
   receipt_id  INTEGER NOT NULL REFERENCES receipt(id) ON DELETE CASCADE,
   name        TEXT    NOT NULL,
   price_cents INTEGER NOT NULL,
@@ -59,6 +59,10 @@ CREATE TABLE IF NOT EXISTS item (
   position    INTEGER NOT NULL DEFAULT 0,
   item_code   TEXT
 );
+
+-- One row per PAID OpenAI request (decode and web each count), for the daily cap.
+CREATE TABLE IF NOT EXISTS lookup_call (at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_lookup_call_at ON lookup_call(at);
 
 -- Cached answers to "what is item number N at store S" (F2). label NULL = looked up, unknown.
 CREATE TABLE IF NOT EXISTS product_lookup (
@@ -131,10 +135,58 @@ function migrate(db) {
   if (!cols.includes('created_by')) db.exec('ALTER TABLE receipt ADD COLUMN created_by INTEGER');
   const itemCols = db.prepare('PRAGMA table_info(item)').all().map((c) => c.name);
   if (!itemCols.includes('item_code')) db.exec('ALTER TABLE item ADD COLUMN item_code TEXT');
+  rebuildItemAutoincrement(db);
   // Receipts confirmed before freezing existed get frozen now, from today's members.
   const old = db.prepare("SELECT id FROM receipt WHERE status = 'confirmed' AND locked_split IS NULL").all();
   for (const r of old) freezeSplit(db, r.id);
   migratePolls(db);
+}
+
+// SQLite reuses the highest item id after a delete unless the key is AUTOINCREMENT, so a stale
+// edit sheet could overwrite a DIFFERENT line that got the freed id. Existing databases need a
+// table rebuild (SQLite can't alter a primary key). Idempotent: skipped once it is AUTOINCREMENT.
+//
+// Foreign keys: item is referenced by polled_item and opt_out (ON DELETE CASCADE). Dropping a
+// parent table with foreign_keys ON would cascade-delete those rows, so we follow SQLite's
+// documented procedure: foreign_keys OFF (it cannot change inside a transaction, so before
+// BEGIN), rebuild in one transaction, `PRAGMA foreign_key_check` before COMMIT (any violation
+// rolls everything back), then foreign_keys ON again. The children refer to "item" by name, so
+// renaming item_new -> item reconnects them with no change to their own tables.
+function rebuildItemAutoincrement(db) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'item'").get();
+  if (!row || /AUTOINCREMENT/i.test(row.sql)) return;
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    db.exec('BEGIN');
+    try {
+      db.exec(`CREATE TABLE item_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        receipt_id  INTEGER NOT NULL REFERENCES receipt(id) ON DELETE CASCADE,
+        name        TEXT    NOT NULL,
+        price_cents INTEGER NOT NULL,
+        quantity    REAL,
+        ai_flagged  INTEGER NOT NULL DEFAULT 0,
+        ai_guess    TEXT,
+        position    INTEGER NOT NULL DEFAULT 0,
+        item_code   TEXT
+      )`);
+      db.exec(`INSERT INTO item_new (id, receipt_id, name, price_cents, quantity, ai_flagged, ai_guess, position, item_code)
+               SELECT id, receipt_id, name, price_cents, quantity, ai_flagged, ai_guess, position, item_code FROM item`);
+      db.exec('DROP TABLE item');
+      db.exec('ALTER TABLE item_new RENAME TO item');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_item_receipt ON item(receipt_id, position)');
+      // Copying explicit ids already set sqlite_sequence to max(id); make sure it can only be higher.
+      const max = db.prepare('SELECT COALESCE(MAX(id), 0) AS m FROM item').get().m;
+      db.prepare("UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'item'").run(max);
+      if (db.prepare('PRAGMA foreign_key_check').all().length) throw new Error('foreign_key_check failed after rebuilding item');
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+  }
 }
 
 // Single-poll-per-receipt -> several polls. Idempotent: each step checks its own state.

@@ -21,6 +21,7 @@ const S = {
   view: null,        // current receipt view
   selected: [],      // polled item ids (poll composer)
   editId: null,      // item being edited
+  editSeen: null,    // {name, price} that sheet opened with, to spot someone else's edit
   confirmDelete: false,
   newSheet: false,
   payerSheet: false,   // review: change who paid
@@ -1157,7 +1158,12 @@ document.addEventListener('click', (e) => {
       go('scan');
     }),
 
-    edit: () => { S.editId = id; S.confirmDelete = false; render(); },
+    edit: () => {
+      S.editId = id; S.confirmDelete = false;
+      const it = S.view.items.find((i) => i.id === id);
+      S.editSeen = it ? { name: it.name, price: it.price_cents } : null; // what the sheet opened with
+      render();
+    },
     'cancel-edit': () => { if (!stop) { S.editId = null; S.confirmDelete = false; render(); } },
     'use-guess': () => {
       const it = S.view.items.find((i) => i.id === S.editId);
@@ -1174,6 +1180,13 @@ document.addEventListener('click', (e) => {
       const name = (document.getElementById('edit-name').value || '').trim() || 'Untitled item';
       const price = parseFloat(document.getElementById('edit-price').value);
       await freshen();
+      const cur = S.view.items.find((i) => i.id === S.editId);
+      if (!cur) { S.editId = null; return toast('That line was removed by someone else.'); }
+      const seen = S.editSeen;
+      if (seen && (cur.name !== seen.name || cur.price_cents !== seen.price)) {
+        S.editSeen = { name: cur.name, price: cur.price_cents }; // sheet re-renders with the fresh values
+        return toast('Someone else just changed this line. Check it and save again.');
+      }
       const items = S.view.items.map((i) =>
         i.id === S.editId
           ? { id: i.id, itemCode: i.item_code, name, priceCents: Math.round((isNaN(price) ? 0 : price) * 100), quantity: i.quantity, aiFlagged: false, aiGuess: null }
@@ -1187,6 +1200,10 @@ document.addEventListener('click', (e) => {
     'cancel-delete': () => { S.confirmDelete = false; render(); },
     'delete-item': () => act(async () => {
       await freshen();
+      if (!S.view.items.some((i) => i.id === S.editId)) {
+        S.editId = null; S.confirmDelete = false;
+        return toast('Already removed.');
+      }
       const items = S.view.items.filter((i) => i.id !== S.editId).map(toPayload);
       S.view = await putItems(items);
       S.editId = null;
