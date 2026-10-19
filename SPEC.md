@@ -206,6 +206,7 @@ original review.
 ### P1
 - [x] **B6** A 1-item poll fails (Telegram needs ≥ 2 options). → "I'm in on all of these" option (part of multi-poll, §8).
 - [x] **B7** People in on everything can't vote. → Same option.
+- [x] **F2** Item numbers → readable labels (owner request 2026-10-19). Scan captures each line's printed item number; the reader expands store shorthand ("KS" = Kirkland Signature) into a short label (brand, product, size); lines still unclear are looked up on the web by store + item number in the background (max 15 per receipt); every answer is cached per store + item number. Results only ever fill the "Use AI guess" suggestion — never the name or price automatically. Item numbers show small under the name.
 - [x] **F1** Multiple polls per receipt (§8). Owner request, 2026-10-19. Live on the main bot 2026-10-19.
 - [x] **B8** Votes accepted after the deadline and after lock. → Check status + `poll_closes_at` in `applyPollAnswer`.
 - [x] **B9** Export CSV link gets a 401 in Telegram (no `initData` header). → Remove CSV export (button + endpoint); copying is enough.
@@ -278,6 +279,12 @@ original review.
 - [ ] **B59** (P3) TELEGRAM_OWNER_ID with stray spaces never matches (fails closed). → trim().
 - [ ] **B60** (P3) After a group→supergroup migration, closing a pre-migration poll may leave it open in Telegram (money unaffected).
 
+### Found by the F2 adversarial test (verdict PASS) — fixes in progress
+- [ ] **B61** (P2, cost) Rescans pay for the same lookups again (no in-flight dedupe; cap is per scan); failed lookups are never cached; no daily cap.
+- [ ] **B62** (P3) Saving from a screen older than freshly-arrived labels wipes them; item numbers hidden on flagged lines (SPEC F2 says always show); cache hits flag lines the OCR was sure about.
+- [ ] **B63** (P3) Labels with markup/URLs/long digit runs are accepted and cached forever; renaming a line doesn't correct the cache; lookups still write to locked receipts.
+- [ ] **B61b** (P3) The house is created on the bot-REMOVED event (my_chat_member member→left), and the greeting is attempted while kicked.
+
 ### P3: housekeeping
 - [x] **B20** No commits yet. → First commit pushed to github.com/benguy6/grosplit (private).
 - [x] **B21** `.env.example` emptied in the working tree (staged copy is fine).
@@ -303,6 +310,8 @@ Q5 (no CSV). See the decision log.
 | 2026-10-04 | Locked splits are frozen at lock time (§7). |
 | 2026-10-04 | Poll gets an "I'm in on everything" option; item cap 9 (§8). |
 | 2026-10-19 | Owner: polls are no longer capped. Long lists become several linked polls of ≤ 9 items (§8). |
+| 2026-10-19 | Owner: build F2 (item-number lookups into readable labels). Web lookups cost a little per new product; cached forever per store + number. |
+| 2026-10-19 | Owner: build F2 (item-number lookups into readable labels). Web lookups cost a little per new product; cached forever per store + number. |
 | 2026-10-19 | Deployed to Fly: https://grosplit-blk42.fly.dev (app grosplit-blk42, region iad, one machine, one 1GB volume). The laptop host is retired; scripts/host.ps1 stays as a fallback. |
 | 2026-10-19 | Only the owner (TELEGRAM_OWNER_ID, kept in .env.production / Fly secret) can set up or re-link the house. Fly starts with a fresh database (the laptop one has no house yet). |
 | 2026-10-19 | Owner: the real house is the Telegram group "Watertown Family". The old test house is archived in backups/ (fresh grosplit.db). |

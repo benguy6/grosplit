@@ -99,7 +99,7 @@ function resetTransient() {
 
 async function go(screen) {
   resetTransient();
-  if (screen !== 'live') stopLive();
+  stopLive();
   S.screen = screen;
   S.scanError = null;
   render();
@@ -107,6 +107,8 @@ async function go(screen) {
     // Votes arrive by webhook; the Mini App polls for them.
     liveTimer = setInterval(refreshView, 4000);
   }
+  // Item-number lookups finish a few seconds after a scan; check back until they're done.
+  if (screen === 'review' && S.view && S.view.lookupsPending > 0) liveTimer = setInterval(refreshReview, 3000);
 }
 
 async function refreshState() {
@@ -117,6 +119,16 @@ async function loadReceipt(id) {
   S.view = await api('GET', '/api/receipt/' + id);
   resetTransient();
   S.selected = S.view.polledItemIds.slice();
+}
+
+async function refreshReview() {
+  if (S.screen !== 'review' || !S.view) return stopLive();
+  try {
+    const next = await api('GET', '/api/receipt/' + S.view.receipt.id);
+    const sig = (v) => JSON.stringify([v.lookupsPending, v.items.map((i) => [i.id, i.name, i.ai_guess, i.ai_flagged, i.item_code])]);
+    if (sig(next) !== sig(S.view) && !S.editId && !S.busy) { S.view = next; render(); }
+    if (!next.lookupsPending) stopLive();
+  } catch { /* transient; next tick retries */ }
 }
 
 async function refreshView() {
@@ -435,6 +447,7 @@ function screenReview() {
         <span style="flex:1">${flags.length === 1 ? "1 name the AI wasn't sure about" : flags.length + " names the AI wasn't sure about"}</span>
         <button data-act="fix-all" style="font:500 12px var(--ui);color:var(--amber-text);text-decoration:underline">Fix all</button>
       </div>` : ''}
+      ${v.lookupsPending > 0 ? `<div style="margin-top:9px;font:400 12.5px var(--ui);color:var(--ink-60)">Looking up ${v.lookupsPending} item number${v.lookupsPending === 1 ? '' : 's'}…</div>` : ''}
       ${mismatch ? `<div class="banner" style="margin-top:8px">
         <span style="font:700 13px var(--mono);color:var(--amber-text)">!</span>
         <span style="flex:1">These lines come to ${mono(v.split.totalCents)}, but the receipt says ${mono(v.reconcile.printedCents)}.</span>
@@ -450,7 +463,7 @@ function screenReview() {
           <span class="box ${f ? 'amber' : ''}">${f ? '?' : '✓'}</span>
           <span style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;text-align:left">
             <span style="font:500 15px var(--ui);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.name)}${it.quantity ? ' ×' + it.quantity : ''}</span>
-            <span style="font:400 11px var(--mono);letter-spacing:.03em;color:${f ? 'var(--amber-text)' : 'var(--ink-40)'}">${f ? 'AI UNSURE · TAP TO FIX THE NAME' : 'SPLIT ' + v.members.length + ' WAYS · ' + fmt(each) + ' EA'}</span>
+            <span style="font:400 11px var(--mono);letter-spacing:.03em;color:${f ? 'var(--amber-text)' : 'var(--ink-40)'}">${f ? 'AI UNSURE · TAP TO FIX THE NAME' : (it.item_code ? '#' + esc(it.item_code) + ' · ' : '') + 'SPLIT ' + v.members.length + ' WAYS · ' + fmt(each) + ' EA'}</span>
           </span>
           <span class="money">${fmt(it.price_cents)}</span>
           <span class="pill" style="padding:6px 10px;font:500 11px var(--ui);color:var(--ink-60);background:var(--paper)">Edit</span>
@@ -981,7 +994,7 @@ function editSheet() {
       <div class="grab"></div>
       <div style="display:flex;align-items:baseline;justify-content:space-between">
         <div class="title">Edit item</div>
-        <div style="font:400 11px var(--mono);color:var(--ink-40)">${it.ai_guess ? "AI WASN'T SURE" : 'FROM RECEIPT'}</div>
+        <div style="font:400 11px var(--mono);color:var(--ink-40)">${it.item_code ? '#' + esc(it.item_code) + ' · ' : ''}${it.ai_guess ? "AI WASN'T SURE" : 'FROM RECEIPT'}</div>
       </div>
 
       <div style="display:flex;flex-direction:column;gap:7px;margin-top:15px">
@@ -1155,7 +1168,7 @@ document.addEventListener('click', (e) => {
       const price = parseFloat(document.getElementById('edit-price').value);
       const items = S.view.items.map((i) =>
         i.id === S.editId
-          ? { id: i.id, name, priceCents: Math.round((isNaN(price) ? 0 : price) * 100), quantity: i.quantity, aiFlagged: false, aiGuess: null }
+          ? { id: i.id, itemCode: i.item_code, name, priceCents: Math.round((isNaN(price) ? 0 : price) * 100), quantity: i.quantity, aiFlagged: false, aiGuess: null }
           : toPayload(i));
       S.view = await putItems(items);
       S.editId = null;
@@ -1304,7 +1317,7 @@ document.addEventListener('click', (e) => {
 // Existing items carry their id so the server updates them in place (keeps poll opt-outs).
 // New items (add-item) have no id; items left out of the array are deleted.
 const toPayload = (i) => ({
-  id: i.id, name: i.name, priceCents: i.price_cents, quantity: i.quantity,
+  id: i.id, itemCode: i.item_code, name: i.name, priceCents: i.price_cents, quantity: i.quantity,
   aiFlagged: !!i.ai_flagged, aiGuess: i.ai_guess,
 });
 

@@ -24,7 +24,7 @@ const SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['name', 'price', 'quantity', 'confidence', 'suggested_name'],
+        required: ['name', 'price', 'quantity', 'confidence', 'suggested_name', 'item_number'],
         properties: {
           name: { type: 'string', description: 'Exactly as printed, abbreviations intact' },
           price: {
@@ -35,7 +35,11 @@ const SCHEMA = {
           confidence: { type: 'number', description: '0-1, how sure you are of name AND price' },
           suggested_name: {
             type: ['string', 'null'],
-            description: 'Expanded readable name if the printed one is abbreviated, else null',
+            description: 'Short readable label "<brand> <product>, <size/pack>" (max 40 chars) for any abbreviated or shorthand printed name, else null',
+          },
+          item_number: {
+            type: ['string', 'null'],
+            description: "The store's product/item number printed on this line, digits exactly as printed, else null",
           },
         },
       },
@@ -50,9 +54,16 @@ Rules:
 - "price" is the LINE TOTAL as printed, not a unit price.
 - Coupons, discounts, deposits and refunds are items with a NEGATIVE price.
 - Do NOT include subtotal, tax, or total lines as items — those go in their own fields.
-- "name" is exactly as printed, abbreviations and all. If the printed name is an
-  abbreviation, put a readable expansion in "suggested_name" (e.g. "SPCY CHKN SNDWCH"
-  -> "Spicy chicken sandwich"). Otherwise suggested_name is null.
+- "name" is exactly as printed, abbreviations and all.
+- "item_number": many stores (Costco, Sam's Club, ...) print a product number beside each
+  line, e.g. "1234567 KS U/S QTRS". Put those digits, exactly as printed, in "item_number"
+  and keep them OUT of "name". If a line has no such number, null.
+- "suggested_name": ALWAYS give one when the printed name is an abbreviation or store
+  shorthand. Make it a short label "<brand> <product>, <size/pack>" of at most 40
+  characters, using what you know of the store's shorthand. Examples: Costco "KS" = Kirkland
+  Signature, "U/S" = unsalted, "QTRS" = quarters, "RL" = rolls, "ORG" = organic, "CHKN" =
+  chicken. "KS U/S QTRS" -> "Kirkland unsalted butter, 4 sticks"; "SPCY CHKN SNDWCH" ->
+  "Spicy chicken sandwich". If the name is already plain English, null.
 - "confidence" reflects how clearly you can read BOTH the name and the price.
   Use below 0.8 when the text is blurred, cut off, or ambiguous.
 - Never invent a line you cannot see. Omission is better than invention.`;
@@ -114,7 +125,8 @@ function normalise(parsed) {
       const priceCents = toCents(it.price);
       if (priceCents === null) return null; // a line we cannot price is not a line
       const unsure = (it.confidence ?? 1) < CONFIDENCE_THRESHOLD;
-      const guess = it.suggested_name && it.suggested_name !== it.name ? it.suggested_name : null;
+      const guess = it.suggested_name && it.suggested_name !== it.name ? String(it.suggested_name).trim().slice(0, 40) : null;
+      const code = it.item_number ? String(it.item_number).replace(/\s+/g, '').slice(0, 32) : null;
       return {
         name: it.name,
         priceCents,
@@ -123,6 +135,7 @@ function normalise(parsed) {
         // both are cases where a human should look before the split is locked.
         aiFlagged: unsure || guess !== null,
         aiGuess: guess,
+        itemCode: code || null,
       };
     })
     .filter(Boolean);

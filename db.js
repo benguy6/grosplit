@@ -56,7 +56,18 @@ CREATE TABLE IF NOT EXISTS item (
   quantity    REAL,
   ai_flagged  INTEGER NOT NULL DEFAULT 0,
   ai_guess    TEXT,
-  position    INTEGER NOT NULL DEFAULT 0
+  position    INTEGER NOT NULL DEFAULT 0,
+  item_code   TEXT
+);
+
+-- Cached answers to "what is item number N at store S" (F2). label NULL = looked up, unknown.
+CREATE TABLE IF NOT EXISTS product_lookup (
+  store_key    TEXT    NOT NULL,
+  item_code    TEXT    NOT NULL,
+  label        TEXT,
+  source       TEXT,
+  looked_up_at INTEGER NOT NULL,
+  PRIMARY KEY (store_key, item_code)
 );
 
 -- One receipt can have several Telegram polls (max 9 items each), numbered by part.
@@ -118,6 +129,8 @@ function migrate(db) {
   if (!cols.includes('locked_split')) db.exec('ALTER TABLE receipt ADD COLUMN locked_split TEXT');
   // NULL for receipts that predate it: only their grocer can manage them.
   if (!cols.includes('created_by')) db.exec('ALTER TABLE receipt ADD COLUMN created_by INTEGER');
+  const itemCols = db.prepare('PRAGMA table_info(item)').all().map((c) => c.name);
+  if (!itemCols.includes('item_code')) db.exec('ALTER TABLE item ADD COLUMN item_code TEXT');
   // Receipts confirmed before freezing existed get frozen now, from today's members.
   const old = db.prepare("SELECT id FROM receipt WHERE status = 'confirmed' AND locked_split IS NULL").all();
   for (const r of old) freezeSplit(db, r.id);
@@ -271,13 +284,13 @@ function createReceipt(db, { householdId, store, grocerId, createdBy = null, cre
 function replaceItems(db, receiptId, rows) {
   const del = db.prepare('DELETE FROM item WHERE receipt_id = ?');
   const ins = db.prepare(
-    'INSERT INTO item (receipt_id, name, price_cents, quantity, ai_flagged, ai_guess, position) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO item (receipt_id, name, price_cents, quantity, ai_flagged, ai_guess, position, item_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
   );
   db.exec('BEGIN');
   try {
     del.run(receiptId);
     rows.forEach((r, i) =>
-      ins.run(receiptId, r.name, r.priceCents, r.quantity ?? null, r.aiFlagged ? 1 : 0, r.aiGuess ?? null, i),
+      ins.run(receiptId, r.name, r.priceCents, r.quantity ?? null, r.aiFlagged ? 1 : 0, r.aiGuess ?? null, i, r.itemCode ?? null),
     );
     db.exec('COMMIT');
   } catch (e) {
@@ -294,21 +307,22 @@ function syncItems(db, receiptId, rows, knownIds) {
   const mine = new Set(items(db, receiptId).map((i) => i.id));
   const keep = new Set();
   const upd = db.prepare(
-    'UPDATE item SET name = ?, price_cents = ?, quantity = ?, ai_flagged = ?, ai_guess = ?, position = ? WHERE id = ? AND receipt_id = ?',
+    'UPDATE item SET name = ?, price_cents = ?, quantity = ?, ai_flagged = ?, ai_guess = ?, position = ?, item_code = COALESCE(?, item_code) WHERE id = ? AND receipt_id = ?',
   );
   const ins = db.prepare(
-    'INSERT INTO item (receipt_id, name, price_cents, quantity, ai_flagged, ai_guess, position) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO item (receipt_id, name, price_cents, quantity, ai_flagged, ai_guess, position, item_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
   );
   db.exec('BEGIN');
   try {
     rows.forEach((r, i) => {
       const flat = [r.name, r.priceCents, r.quantity ?? null, r.aiFlagged ? 1 : 0, r.aiGuess ?? null, i];
+      const code = r.itemCode ?? null; // omitted by older clients: an existing code is kept
       const id = Number(r.id);
       if (mine.has(id) && !keep.has(id)) {
-        upd.run(...flat, id, receiptId);
+        upd.run(...flat, code, id, receiptId);
         keep.add(id);
       } else {
-        ins.run(receiptId, ...flat);
+        ins.run(receiptId, ...flat, code);
       }
     });
     const del = db.prepare('DELETE FROM item WHERE id = ? AND receipt_id = ?');

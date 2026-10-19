@@ -10,6 +10,7 @@ const tg = require('./telegram.js');
 const { evenSplitCents } = require('./split.js');
 const { parseReceipt } = require('./ocr.js');
 const seed = require('./seed.js');
+const lookup = require('./lookup.js');
 
 const PORT = Number(process.env.PORT || 3000);
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
@@ -185,6 +186,7 @@ function receiptView(receiptId, me) {
     split,
     evenShareCents: evenSplitCents(split.totalCents, members.length),
     reconcile,
+    lookupsPending: lookup.pending(receiptId),
     meId: me.id,
     isGrocer: me.id === r.grocer_id,
     canManage: me.id === r.grocer_id || me.id === r.created_by,
@@ -288,6 +290,7 @@ async function api(req, res, url, me) {
         quantity: typeof i.quantity === 'number' && Number.isFinite(i.quantity) ? i.quantity : null,
         aiFlagged: !!i.aiFlagged,
         aiGuess: typeof i.aiGuess === 'string' ? i.aiGuess.trim().slice(0, 200) || null : null,
+        itemCode: typeof i.itemCode === 'string' ? i.itemCode.replace(/\s+/g, '').slice(0, 32) || null : null,
       }));
       if (!rows.every((i) => validCents(i.priceCents))) return fail(res, 400, 'priceCents is out of range');
       // The client's picture must match the server's exactly. Otherwise a stale screen
@@ -334,6 +337,7 @@ async function api(req, res, url, me) {
       db.prepare('UPDATE receipt SET tax_cents = ?, printed_total_cents = ? WHERE id = ?')
         .run(parsed.taxCents, parsed.printedTotalCents, id);
       if (parsed.store) db.prepare('UPDATE receipt SET store = ? WHERE id = ?').run(parsed.store, id);
+      lookup.afterScan(db, id); // cached labels now; web lookups continue in the background
       return ok(res, receiptView(id, me));
     }
 

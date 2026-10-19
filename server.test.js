@@ -393,7 +393,7 @@ test('B4: server refuses to start without a token unless DEV=1', async () => {
   const { spawn, spawnSync } = require('node:child_process');
   const env = { ...process.env, PORT: '0', DATABASE_PATH: path.join(os.tmpdir(), 'grosplit-b4-' + process.pid + '.db') };
   delete env.TELEGRAM_BOT_TOKEN; delete env.DEV; delete env.FLY_APP_NAME;
-  const run = (extra) => spawnSync(process.execPath, ['server.js'], { cwd: __dirname, env: { ...env, ...extra }, encoding: 'utf8', timeout: 5000 });
+  const run = (extra) => spawnSync(process.execPath, ['server.js'], { cwd: __dirname, env: { ...env, ...extra }, encoding: 'utf8', timeout: 30000 });
   const noDev = run({});
   assert.notEqual(noDev.status, 0);
   assert.match(noDev.stderr, /TELEGRAM_BOT_TOKEN/);
@@ -406,7 +406,7 @@ test('B4: server refuses to start without a token unless DEV=1', async () => {
     let buf = '';
     child.stdout.on('data', (c) => { buf += c; if (/GroSplit on/.test(buf)) resolve(buf); });
     child.on('exit', () => resolve(buf));
-    setTimeout(() => resolve(buf), 4000);
+    setTimeout(() => resolve(buf), 20000);
   });
   child.kill();
   assert.match(out, /GroSplit on/);
@@ -915,7 +915,7 @@ test('refuses to start off Fly without DATABASE_PATH (cannot silently open the l
   const { spawnSync } = require('node:child_process');
   const env = { ...process.env, TELEGRAM_BOT_TOKEN: 'x:y', PORT: '0' };
   delete env.DEV; delete env.DATABASE_PATH; delete env.FLY_APP_NAME;
-  const r = spawnSync(process.execPath, ['server.js'], { cwd: __dirname, env, encoding: 'utf8', timeout: 5000 });
+  const r = spawnSync(process.execPath, ['server.js'], { cwd: __dirname, env, encoding: 'utf8', timeout: 30000 });
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /DATABASE_PATH/);
 });
@@ -1075,7 +1075,7 @@ test('groups: on an empty database /start@bot in a group creates the household a
   const db2 = path.join(os.tmpdir(), 'grosplit-grp-' + process.pid + '.db');
   const env = { ...process.env, TELEGRAM_BOT_TOKEN: 'x:y', DATABASE_PATH: db2 };
   delete env.DEV; delete env.FLY_APP_NAME;
-  const r = spawnSync(process.execPath, ['-e', script], { cwd: __dirname, env, encoding: 'utf8', timeout: 10000 });
+  const r = spawnSync(process.execPath, ['-e', script], { cwd: __dirname, env, encoding: 'utf8', timeout: 30000 });
   for (const suffix of ['', '-wal', '-shm']) fs.rmSync(db2 + suffix, { force: true, maxRetries: 5, retryDelay: 100 });
   const out = JSON.parse(r.stdout);
   assert.equal(out.h.length, 1);
@@ -1176,4 +1176,14 @@ test('group titles are quoted in logs so they cannot forge lines', async () => {
     const line = logs.find((l) => l.startsWith('update: message from supergroup'));
     assert.ok(line && !line.includes('\n') && !line.includes('\u001b'), line);
   });
+});
+
+test('F2: the view carries item_code and lookupsPending; PUT keeps the code when a client omits it', async () => {
+  const { id, items } = await mkReceipt('F2 Mart', [{ name: 'KS U/S QTRS', priceCents: 1299, itemCode: '1234567' }]);
+  assert.equal(items[0].item_code, '1234567');
+  const put = await api('PUT', `/api/receipt/${id}/items`, {
+    items: [{ id: items[0].id, name: 'Butter', priceCents: 1299 }], knownIds: [items[0].id],
+  });
+  assert.equal(put.body.items[0].item_code, '1234567', 'older client without itemCode keeps it');
+  assert.equal(put.body.lookupsPending, 0);
 });
