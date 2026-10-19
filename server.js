@@ -30,7 +30,11 @@ function die(msg) {
 if (DEV && process.env.FLY_APP_NAME) die('Refusing to start: DEV=1 is not allowed on Fly (it disables authentication).');
 if (!DEV && !TOKEN) die('Refusing to start: TELEGRAM_BOT_TOKEN is not set. For local demo data run `npm run demo` (DEV=1).');
 
-// Demo data must never land in the real database.
+// Demo data must never land in the real database, and a dev run must never silently
+// open the live one: off Fly (which sets it in fly.toml) the path must be explicit.
+if (!DEV && !process.env.DATABASE_PATH && !process.env.FLY_APP_NAME) {
+  die('Refusing to start: DATABASE_PATH is not set. Set it explicitly (e.g. ./test.db for the test bot).');
+}
 const DB_PATH = process.env.DATABASE_PATH || (DEV ? './demo.db' : './grosplit.db');
 
 // Stable across restarts and scale-to-zero (Telegram allows A-Za-z0-9_- here).
@@ -72,6 +76,16 @@ const readJson = async (req) => {
   const raw = await readBody(req, 1024 * 1024);
   return raw.length ? JSON.parse(raw.toString('utf8')) : {};
 };
+
+// One log line per distinct message per minute (a scanner can hammer /api/).
+const lastWarn = new Map();
+function warnOncePerMinute(msg) {
+  const now = Date.now();
+  if (now - (lastWarn.get(msg) || 0) < 60_000) return;
+  if (lastWarn.size > 100) lastWarn.clear();
+  lastWarn.set(msg, now);
+  console.warn(msg);
+}
 
 // Mutable only so tests can exercise the real (non-DEV) path without a network.
 const auth = { dev: DEV, token: TOKEN };
@@ -120,6 +134,7 @@ async function authenticate(req) {
 // Money at the trust boundary: a huge or non-finite value would be stored and
 // then break every read of the receipt (and so /api/state) forever.
 const MAX_CENTS = 10_000_000;
+const MAX_POLLS = 15; // Telegram rate-limits a group to ~20 messages a minute
 const validCents = (x) => Number.isSafeInteger(x) && Math.abs(x) <= MAX_CENTS;
 
 // Everything the split needs, shaped for both the API and the poll monitor.
@@ -130,7 +145,11 @@ function receiptView(receiptId, me) {
   const items = d.items(db, receiptId);
   const polled = d.polledItems(db, receiptId);
   const outs = d.optOuts(db, receiptId);
-  const voters = d.voters(db, receiptId);
+  const pollRows = d.polls(db, receiptId);
+  const voteProgress = {};
+  for (const v of d.voters(db, receiptId)) voteProgress[v.member_id] = (voteProgress[v.member_id] || 0) + 1;
+  // "Voted" means answered EVERY poll of the receipt.
+  const voterIds = Object.keys(voteProgress).map(Number).filter((m) => voteProgress[m] >= pollRows.length);
 
   let split;
   if (r.status === 'confirmed') {
@@ -154,7 +173,14 @@ function receiptView(receiptId, me) {
     items,
     polledItemIds: polled.map((p) => p.item_id),
     optOuts: outs.map((o) => ({ itemId: o.item_id, memberId: o.member_id })),
-    voterIds: voters.map((v) => v.member_id),
+    voterIds,
+    pollCount: pollRows.length,
+    voteProgress,
+    polls: pollRows.map((p) => ({
+      id: p.id,
+      part: p.part,
+      itemIds: polled.filter((x) => x.poll_id === p.id).map((x) => x.item_id),
+    })),
     members,
     split,
     evenShareCents: evenSplitCents(split.totalCents, members.length),
@@ -316,53 +342,92 @@ async function api(req, res, url, me) {
       const b = await readJson(req);
       const chosen = (b.itemIds || []).map(Number);
       if (!chosen.length) return fail(res, 400, 'pick at least one item');
-      if (chosen.length > tg.MAX_POLL_OPTIONS) {
-        return fail(res, 400, 'Telegram allows at most ' + tg.MAX_POLL_OPTIONS + ' poll options');
-      }
-      const all = d.items(db, id);
-      const picked = all.filter((i) => chosen.includes(i.id));
+      const picked = d.items(db, id).filter((i) => chosen.includes(i.id)); // receipt order
       if (picked.length !== chosen.length) return fail(res, 400, 'unknown item in selection');
+
+      // Telegram polls take 10 options: up to 9 items plus "I'm in on all of these".
+      // Split into balanced chunks (14 -> 7+7, 20 -> 7+7+6).
+      const per = tg.MAX_POLL_OPTIONS - 1;
+      const parts = Math.ceil(picked.length / per);
+      const chunks = [];
+      for (let k = 0, at = 0; k < parts; k++) {
+        const size = Math.floor(picked.length / parts) + (k < picked.length % parts ? 1 : 0);
+        chunks.push(picked.slice(at, at + size));
+        at += size;
+      }
+
+      if (parts > MAX_POLLS) {
+        return fail(res, 400, "That's more than " + MAX_POLLS + ' polls — pick the items people might actually want out of.');
+      }
 
       const house = d.household(db, r.household_id);
       const view = receiptView(id, me);
       const money = (c) => house.currency + (c / 100).toFixed(2);
-      const question =
-        r.store + ' · ' + money(view.split.totalCents) +
-        " — tick anything you're NOT in on. Closes in " + house.poll_window_hours + 'h.';
-      const options = picked.map((i) =>
-        (i.name + ' — ' + money(i.price_cents)).slice(0, tg.MAX_OPTION_CHARS),
-      );
+      const question = (k) =>
+        (r.store + ' · ' + money(view.split.totalCents) + ' — ' + (parts > 1 ? (k + 1) + ' of ' + parts + ': ' : '') +
+        "tick anything you're NOT in on. Closes in " + house.poll_window_hours + 'h.').slice(0, 300);
+      const optionsFor = (chunk) => [
+        ...chunk.map((i) => (i.name + ' — ' + money(i.price_cents)).slice(0, tg.MAX_OPTION_CHARS)),
+        "✅ I'm in on all of these",
+      ];
 
-      let poll = null;
-      if (!DEV && house.telegram_chat_id) {
-        try {
-          poll = await tg.sendPoll(TOKEN, house.telegram_chat_id, question.slice(0, 300), options);
-        } catch (e) {
-          return fail(res, 502, 'Telegram refused the poll: ' + e.message);
-        }
-      }
+      // Claim the receipt before sending, so two concurrent requests can't both send (and
+      // orphan one set of polls). poll_closes_at doubles as the claim time while posting.
+      const nowSec = Math.floor(Date.now() / 1000);
+      const claim = db.prepare("UPDATE receipt SET status = 'posting', poll_closes_at = ? WHERE id = ? AND status = 'review'")
+        .run(nowSec, id);
+      if (!claim.changes) return fail(res, 409, 'a poll is already being sent on this receipt');
 
-      const closesAt = Math.floor(Date.now() / 1000) + house.poll_window_hours * 3600;
-      db.exec('BEGIN');
+      // Send sequentially, saving each poll's rows the moment it is out, so votes that arrive
+      // while later polls are still sending are not lost. On ANY failure: stop what went out,
+      // forget what was saved, and give the receipt back.
+      const sent = [];
+      let sending = true;
       try {
-        // A new poll replaces the old one completely (SPEC §7).
-        db.prepare('DELETE FROM polled_item WHERE receipt_id = ?').run(id);
-        db.prepare('DELETE FROM opt_out WHERE receipt_id = ?').run(id);
-        db.prepare('DELETE FROM poll_voter WHERE receipt_id = ?').run(id);
-        const ins = db.prepare('INSERT INTO polled_item (receipt_id, item_id, option_index) VALUES (?, ?, ?)');
-        picked.forEach((it, i) => ins.run(id, it.id, i));
-        db.prepare(
-          "UPDATE receipt SET status = 'polling', telegram_poll_id = ?, poll_message_id = ?, poll_closes_at = ? WHERE id = ?",
-        ).run(poll && poll.poll ? poll.poll.id : null, poll ? poll.message_id : null, closesAt, id);
-        db.exec('COMMIT');
+        d.clearPolls(db, id); // a new poll replaces the old ones completely (SPEC §7)
+        const insPoll = db.prepare('INSERT INTO poll (receipt_id, part, telegram_poll_id, message_id) VALUES (?, ?, ?, ?)');
+        const ins = db.prepare('INSERT INTO polled_item (receipt_id, item_id, option_index, poll_id) VALUES (?, ?, ?, ?)');
+        for (let k = 0; k < chunks.length; k++) {
+          let sp = null;
+          if (!auth.dev && house.telegram_chat_id) {
+            sp = await tg.sendPoll(auth.token, house.telegram_chat_id, question(k), optionsFor(chunks[k]));
+            sent.push(sp);
+          }
+          sending = false; // a failure past this point is ours (e.g. an item vanished), not Telegram's
+          db.exec('BEGIN');
+          try {
+            const pid = insPoll.run(id, k + 1, sp && sp.poll ? sp.poll.id : null, sp ? sp.message_id : null).lastInsertRowid;
+            chunks[k].forEach((it, i) => ins.run(id, it.id, i, pid));
+            db.exec('COMMIT');
+          } catch (e) {
+            db.exec('ROLLBACK');
+            throw e;
+          }
+          sending = true;
+        }
+
+        // Commit: only if the receipt is still ours. Anything else (locked, reverted) wins.
+        const closesAt = Math.floor(Date.now() / 1000) + house.poll_window_hours * 3600;
+        const done = db.prepare("UPDATE receipt SET status = 'polling', poll_closes_at = ? WHERE id = ? AND status = 'posting'")
+          .run(closesAt, id);
+        if (!done.changes) {
+          for (const p of sent) await tg.stopPoll(auth.token, house.telegram_chat_id, p.message_id).catch(() => {});
+          return fail(res, 409, 'this receipt changed while the poll was being sent');
+        }
       } catch (e) {
-        db.exec('ROLLBACK');
+        for (const p of sent) await tg.stopPoll(auth.token, house.telegram_chat_id, p.message_id).catch(() => {});
+        if (d.receipt(db, id).status === 'posting') { // still ours
+          d.clearPolls(db, id); // their opt-outs and voters go with them
+          db.prepare("UPDATE receipt SET status = 'review', poll_closes_at = NULL WHERE id = ? AND status = 'posting'").run(id);
+        }
+        if (sending) return fail(res, 502, 'Telegram refused the poll: ' + e.message);
         throw e;
       }
       return ok(res, receiptView(id, me));
     }
 
     if (tail === 'close-poll' && req.method === 'POST') {
+      if (r.status === 'posting') return fail(res, 409, 'the poll is still being sent');
       await closePoll(id);
       return ok(res, receiptView(id, me));
     }
@@ -370,6 +435,7 @@ async function api(req, res, url, me) {
     if (tail === 'confirm' && req.method === 'POST') {
       // Grocer gate — the whole point of grocerId being per receipt.
       if (me.id !== r.grocer_id) return fail(res, 403, 'Only the grocer can lock the split');
+      if (r.status === 'posting') return fail(res, 409, 'the poll is still being sent');
       if (r.status === 'polling') await closePoll(id);
       if (r.status === 'confirmed') return ok(res, receiptView(id, me)); // already frozen
       db.prepare("UPDATE receipt SET status = 'confirmed' WHERE id = ?").run(id);
@@ -406,15 +472,33 @@ async function closePoll(receiptId) {
   const r = d.receipt(db, receiptId);
   if (!r || r.status !== 'polling') return;
   const house = d.household(db, r.household_id);
-  if (!DEV && r.poll_message_id && house.telegram_chat_id) {
-    try {
-      await tg.stopPoll(TOKEN, house.telegram_chat_id, r.poll_message_id);
-    } catch {
-      /* poll may already be closed or deleted — the split proceeds regardless */
+  if (!auth.dev && house.telegram_chat_id) {
+    for (const p of d.polls(db, receiptId)) {
+      if (!p.message_id) continue;
+      try {
+        await tg.stopPoll(auth.token, house.telegram_chat_id, p.message_id);
+      } catch {
+        /* poll may already be closed or deleted — the split proceeds regardless */
+      }
     }
   }
   db.prepare("UPDATE receipt SET status = 'review', poll_closes_at = NULL WHERE id = ? AND status = 'polling'")
     .run(receiptId);
+}
+
+// A send that died mid-flight must not leave the receipt stuck, nor its polls open in
+// Telegram: forget the saved polls (votes included), hand the receipt back, stop them.
+// Longer than 15 polls x the 15s Telegram timeout.
+const POSTING_TIMEOUT = 300;
+async function revertPosting(claimedBefore) {
+  const rows = db.prepare("SELECT id, household_id FROM receipt WHERE status = 'posting' AND poll_closes_at <= ?").all(claimedBefore);
+  for (const r of rows) {
+    const msgs = d.polls(db, r.id).map((p) => p.message_id).filter(Boolean);
+    d.clearPolls(db, r.id);
+    db.prepare("UPDATE receipt SET status = 'review', poll_closes_at = NULL WHERE id = ?").run(r.id);
+    const chat = d.household(db, r.household_id).telegram_chat_id;
+    if (!auth.dev && chat) for (const m of msgs) await tg.stopPoll(auth.token, chat, m).catch(() => {});
+  }
 }
 
 // Close polls that have run past pollWindowHours.
@@ -425,11 +509,18 @@ async function closePoll(receiptId) {
 // the machine is free to sleep when the household isn't shopping.
 async function sweepExpiredPolls() {
   const now = Math.floor(Date.now() / 1000);
+  await revertPosting(now - POSTING_TIMEOUT);
   const due = db
     .prepare("SELECT id FROM receipt WHERE status = 'polling' AND poll_closes_at IS NOT NULL AND poll_closes_at <= ?")
     .all(now);
   for (const row of due) await closePoll(row.id).catch(() => {});
 }
+
+// Votes count while the poll is live — and while the later polls of a multi-poll send are
+// still going out ('posting', whose poll_closes_at is only the claim time). Not after the
+// deadline, not after lock.
+const voteOpen = (r) =>
+  r.status === 'posting' || (r.status === 'polling' && Math.floor(Date.now() / 1000) < r.poll_closes_at);
 
 // Apply one user's answers strictly in arrival order (a vote, then a quick retraction).
 const answerChain = new Map();
@@ -444,10 +535,11 @@ function applyPollAnswer(answer) {
 
 // Telegram sends the option INDEX; polled_item maps index -> item.
 async function applyPollAnswerNow(answer) {
-  const r = db.prepare('SELECT * FROM receipt WHERE telegram_poll_id = ?').get(answer.poll_id);
+  const poll = d.pollByTelegramId(db, answer.poll_id);
+  const r = poll && d.receipt(db, poll.receipt_id);
   if (!r) return;
   // Votes count only while the poll is live: not after the deadline, not after lock.
-  if (r.status !== 'polling' || !(Math.floor(Date.now() / 1000) < r.poll_closes_at)) return;
+  if (!voteOpen(r)) return;
   const user = answer.user;
   if (!user) return;
   let member = d.memberByTelegramId(db, user.id);
@@ -465,9 +557,10 @@ async function applyPollAnswerNow(answer) {
   if (member.id === r.grocer_id) return; // the grocer never votes
   // The receipt may have been locked or re-polled while we awaited Telegram.
   const now = d.receipt(db, r.id);
-  if (!now || now.status !== 'polling' || !(Math.floor(Date.now() / 1000) < now.poll_closes_at) ||
-      now.telegram_poll_id !== r.telegram_poll_id) return;
-  const mapping = d.polledItems(db, r.id);
+  if (!now || !voteOpen(now) ||
+      !d.pollByTelegramId(db, answer.poll_id) || d.pollByTelegramId(db, answer.poll_id).id !== poll.id) return;
+  // This poll's options only. The trailing "in on all of these" option maps to no item.
+  const mapping = d.polledItems(db, r.id).filter((m) => m.poll_id === poll.id);
   const chosen = new Set(
     (answer.option_ids || [])
       .map((idx) => {
@@ -479,12 +572,20 @@ async function applyPollAnswerNow(answer) {
 
   db.exec('BEGIN');
   try {
-    // Retraction sends an EMPTY option_ids, so always clear before inserting.
-    db.prepare('DELETE FROM opt_out WHERE receipt_id = ? AND member_id = ?').run(r.id, member.id);
+    // Retraction sends an EMPTY option_ids, so always clear before inserting. Only this
+    // poll's items: the member's answers to the receipt's other polls stay.
+    db.prepare(
+      'DELETE FROM opt_out WHERE receipt_id = ? AND member_id = ? AND item_id IN (SELECT item_id FROM polled_item WHERE poll_id = ?)',
+    ).run(r.id, member.id, poll.id);
     const ins = db.prepare('INSERT INTO opt_out (receipt_id, item_id, member_id) VALUES (?, ?, ?)');
     for (const itemId of chosen) ins.run(r.id, itemId, member.id);
-    db.prepare('INSERT OR REPLACE INTO poll_voter (receipt_id, member_id, voted_at) VALUES (?, ?, ?)')
-      .run(r.id, member.id, Math.floor(Date.now() / 1000));
+    // An empty answer is a retraction: they are back to "hasn't voted".
+    if ((answer.option_ids || []).length === 0) {
+      db.prepare('DELETE FROM poll_voter WHERE poll_id = ? AND member_id = ?').run(poll.id, member.id);
+    } else {
+      db.prepare('INSERT OR REPLACE INTO poll_voter (poll_id, member_id, voted_at) VALUES (?, ?, ?)')
+        .run(poll.id, member.id, Math.floor(Date.now() / 1000));
+    }
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');
@@ -542,7 +643,40 @@ async function greetGroup(chat) {
   }
 }
 
+// One log line per update: its kind and where it came from. Never message text, people's
+// names or ids, or initData. (Group titles are fine; private chats are not named.)
+// A group title is user-controlled: quote and cap it so it can't forge log lines.
+const logTitle = (t) => JSON.stringify(String(t || '').slice(0, 64));
+
+function describeUpdate(update) {
+  const where = (c) => (c.type === 'group' || c.type === 'supergroup' ? c.type + ' ' + logTitle(c.title) : c.type + ' chat');
+  if (update.poll_answer) return 'poll_answer';
+  if (update.my_chat_member) {
+    const m = update.my_chat_member;
+    const st = (x) => (x && x.status) || '?';
+    return 'my_chat_member ' + st(m.old_chat_member) + '→' + st(m.new_chat_member) + ' in ' + (m.chat ? where(m.chat) : '?');
+  }
+  if (update.message) return 'message from ' + (update.message.chat ? where(update.message.chat) : '?');
+  return 'other (' + Object.keys(update).filter((k) => k !== 'update_id').join(',') + ')';
+}
+
+// Test hook: the bot's identity normally comes from getMe at boot.
+function _setBotForTests(username, id) { BOT_USERNAME = username; BOT_ID = id; }
+
+// Replies are best-effort and never sent in DEV (no real bot).
+const say = (chatId, text) => (auth.dev ? null : tg.sendMessage(auth.token, chatId, text).catch(() => {}));
+
+// /start or /start@thisbot (the form groups use, and it reaches us even with privacy mode on).
+function isStartCommand(update) {
+  const m = /^\/start(?:@(\w+))?(?:\s|$)/.exec((update.message && update.message.text) || '');
+  if (!m) return false;
+  return !m[1] || !BOT_USERNAME || m[1].toLowerCase() === BOT_USERNAME.toLowerCase();
+}
+
+const toldOtherGroup = new Set();
+
 async function handleUpdate(update) {
+  console.log('update:', describeUpdate(update));
   await sweepExpiredPolls(); // so a late vote also closes the poll in Telegram
   if (update.poll_answer) await applyPollAnswer(update.poll_answer);
 
@@ -550,26 +684,66 @@ async function handleUpdate(update) {
   // learns the chat id, so nobody has to look one up by hand.
   // my_chat_member fires on being added regardless of privacy mode, which is
   // why privacy mode can stay on.
-  const chat =
-    (update.message && update.message.chat) ||
-    (update.my_chat_member && update.my_chat_member.chat);
+  // Basic group -> supergroup: the chat id changes. Follow it FIRST, so the next message in
+  // the new id isn't mistaken for a stranger group. (Delivered even in privacy mode.)
+  const msg = update.message;
+  if (msg && msg.chat && (msg.migrate_to_chat_id || msg.migrate_from_chat_id)) {
+    const house = d.firstHousehold(db);
+    const oldId = msg.migrate_to_chat_id ? msg.chat.id : msg.migrate_from_chat_id;
+    const newId = msg.migrate_to_chat_id || msg.chat.id;
+    if (house && house.telegram_chat_id === String(oldId)) {
+      db.prepare('UPDATE household SET telegram_chat_id = ? WHERE id = ?').run(String(newId), house.id);
+      console.log('household group migrated to a supergroup');
+    }
+    return;
+  }
+
+  const chat = (msg && msg.chat) || (update.my_chat_member && update.my_chat_member.chat);
   if (!chat || (chat.type !== 'group' && chat.type !== 'supergroup')) return;
 
+  const start = isStartCommand(update);
+  const added = wasJustAdded(update);
+  const title = chat.title || 'your group';
+  let setUp = false;
   const known = d.householdByChatId(db, chat.id);
   if (!known) {
     const house = d.firstHousehold(db);
+    if (house && house.telegram_chat_id) {
+      // The one-household rule. A stranger group gets one polite reply, never the greeting.
+      if ((start || added) && !toldOtherGroup.has(chat.id)) {
+        toldOtherGroup.add(chat.id);
+        console.log('ignoring group ' + logTitle(chat.title) + ': the household is already linked to another group');
+        await say(chat.id, "I'm already set up for another group.");
+      }
+      return;
+    }
+    // Creating or linking: only the owner may, when TELEGRAM_OWNER_ID is set.
+    const owner = process.env.TELEGRAM_OWNER_ID;
+    const actor = update.my_chat_member ? update.my_chat_member.from : msg && msg.from;
+    if (owner && !(actor && String(actor.id) === String(owner))) {
+      console.log('waiting for the owner to set up the household');
+      return;
+    }
     if (!house) {
       d.createHousehold(db, { name: chat.title || 'My household', telegramChatId: String(chat.id) });
-      console.log('household created from group:', chat.title, chat.id);
-    } else if (!house.telegram_chat_id) {
+      console.log('household created from group', logTitle(chat.title));
+    } else {
       db.prepare('UPDATE household SET telegram_chat_id = ?, name = ? WHERE id = ?')
         .run(String(chat.id), chat.title || house.name, house.id);
-      console.log('household linked to group:', chat.title, chat.id);
+      console.log('household linked to group', logTitle(chat.title));
     }
+    setUp = true;
   }
 
-  // Say hello last, so the household exists by the time anyone taps the link.
-  if (wasJustAdded(update)) await greetGroup(chat);
+  // Say hello last, so the household exists by the time anyone taps the link. A /start that
+  // sets things up gets the button too, since the reply below points at it.
+  if (added || setUp) await greetGroup(chat);
+  if (setUp) {
+    await say(chat.id, '✅ GroSplit is set up for ' + title + '. Everyone tap the button above once to join.');
+  } else if (start && known) {
+    const n = d.members(db, known.id).length;
+    await say(chat.id, '✅ GroSplit is set up here — ' + n + ' housemate' + (n === 1 ? ' has' : 's have') + ' joined.');
+  }
 }
 
 // ── static + routing ─────────────────────────────────────────────────────────
@@ -622,6 +796,7 @@ const server = http.createServer(async (req, res) => {
         me = await authenticate(req);
       } catch (e) {
         if (e instanceof AuthError) return send(res, e.status, { error: e.message, code: e.code });
+        warnOncePerMinute('sign-in rejected: ' + e.message); // the reason only — never initData
         return fail(res, 401, e.message);
       }
       return await api(req, res, url, me);
@@ -633,6 +808,9 @@ const server = http.createServer(async (req, res) => {
     return fail(res, 500, e.message || 'server error');
   }
 });
+
+// Nothing can be mid-send at boot, so any 'posting' left over is from a crash.
+revertPosting(Number.MAX_SAFE_INTEGER).catch((e) => console.error('revertPosting:', e.message));
 
 if (require.main === module) {
   server.listen(PORT, async () => {
@@ -710,5 +888,5 @@ async function longPoll() {
 }
 
 module.exports = {
-  server, db, auth, WEBHOOK_SECRET, startUpdates, handleUpdate, applyPollAnswer, closePoll, receiptView, wasJustAdded,
+  server, db, auth, _setBotForTests, warnOncePerMinute, WEBHOOK_SECRET, startUpdates, handleUpdate, applyPollAnswer, closePoll, receiptView, wasJustAdded,
 };

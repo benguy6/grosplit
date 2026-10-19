@@ -108,7 +108,7 @@ test('full flow: create, add items, poll, vote, retract, close, lock', async () 
   const [, aisha, mira] = members;
   db.prepare('UPDATE member SET telegram_user_id = ? WHERE id = ?').run('5001', aisha.id);
   db.prepare('UPDATE member SET telegram_user_id = ? WHERE id = ?').run('5002', mira.id);
-  db.prepare("UPDATE receipt SET telegram_poll_id = 'testpoll' WHERE id = ?").run(id);
+  db.prepare("UPDATE poll SET telegram_poll_id = 'testpoll' WHERE receipt_id = ? AND part = 1").run(id);
 
   await handleUpdate({ poll_answer: { poll_id: 'testpoll', user: { id: 5001 }, option_ids: [0] } });
   await handleUpdate({ poll_answer: { poll_id: 'testpoll', user: { id: 5002 }, option_ids: [0] } });
@@ -123,7 +123,7 @@ test('full flow: create, add items, poll, vote, retract, close, lock', async () 
   await handleUpdate({ poll_answer: { poll_id: 'testpoll', user: { id: 5002 }, option_ids: [] } });
   view = (await api('GET', `/api/receipt/${id}`)).body;
   assert.equal(view.optOuts.length, 1, 'retraction removes the opt-out');
-  assert.equal(view.voterIds.length, 2, 'but she still counts as having voted');
+  assert.equal(view.voterIds.length, 1, 'a retraction un-votes her (B-retract)');
 
   // Close and lock.
   const closed = await api('POST', `/api/receipt/${id}/close-poll`);
@@ -150,19 +150,18 @@ test('the grocer gate: a non-grocer cannot lock the split', async () => {
   assert.equal(view.isGrocer, false, 'UI shows the waiting-on-them state');
 });
 
-test('the poll option cap is enforced server-side, not just in the UI', async () => {
+test('there is no item cap: 12 items become two polls; an empty selection is refused', async () => {
   const created = await api('POST', '/api/receipt', { store: 'Target' });
   const id = created.body.receipt.id;
   const many = Array.from({ length: 12 }, (_, i) => ({ name: 'Item ' + i, priceCents: 100 + i }));
   const put = await api('PUT', `/api/receipt/${id}/items`, { items: many, knownIds: [] });
 
-  const tooMany = await api('POST', `/api/receipt/${id}/poll`, {
-    itemIds: put.body.items.map((i) => i.id),
-  });
-  assert.equal(tooMany.status, 400);
-  assert.match(tooMany.body.error, /at most 10/);
+  const all = await api('POST', `/api/receipt/${id}/poll`, { itemIds: put.body.items.map((i) => i.id) });
+  assert.equal(all.status, 200);
+  assert.deepEqual(all.body.polls.map((p) => p.itemIds.length), [6, 6]);
 
-  const empty = await api('POST', `/api/receipt/${id}/poll`, { itemIds: [] });
+  const fresh = (await api('POST', '/api/receipt', { store: 'Target 2' })).body.receipt.id;
+  const empty = await api('POST', `/api/receipt/${fresh}/poll`, { itemIds: [] });
   assert.equal(empty.status, 400);
 });
 
@@ -257,7 +256,7 @@ test('B1: editing one item keeps opt-outs on the others; deleting drops only its
   const [wine, milk, eggs] = items;
   const aisha = (await api('GET', '/api/state')).body.members[1];
   await api('POST', `/api/receipt/${id}/poll`, { itemIds: [wine.id, eggs.id] });
-  db.prepare("UPDATE receipt SET telegram_poll_id = 'b1poll' WHERE id = ?").run(id);
+  db.prepare("UPDATE poll SET telegram_poll_id = 'b1poll' WHERE receipt_id = ? AND part = 1").run(id);
   await voteAs(aisha, 7001, 'b1poll', [0, 1]);
   await api('POST', `/api/receipt/${id}/close-poll`);
   assert.equal(d.optOuts(db, id).length, 2);
@@ -290,7 +289,7 @@ test('B2: a locked split does not change when a member joins; late votes are ign
   const { id, items } = await mkReceipt('B2 Mart', [{ name: 'Wine', priceCents: 3000 }, { name: 'Rice', priceCents: 1001 }]);
   const ms = (await api('GET', '/api/state')).body.members;
   await api('POST', `/api/receipt/${id}/poll`, { itemIds: [items[0].id] });
-  db.prepare("UPDATE receipt SET telegram_poll_id = 'b2poll' WHERE id = ?").run(id);
+  db.prepare("UPDATE poll SET telegram_poll_id = 'b2poll' WHERE receipt_id = ? AND part = 1").run(id);
   await voteAs(ms[1], 7002, 'b2poll', [0]);
   const locked = (await api('POST', `/api/receipt/${id}/confirm`)).body;
   assert.equal(locked.receipt.status, 'confirmed');
@@ -310,8 +309,8 @@ test('B8: votes after the deadline are ignored', async () => {
   const { id, items } = await mkReceipt('B8 Mart', [{ name: 'Wine', priceCents: 3000 }]);
   const ms = (await api('GET', '/api/state')).body.members;
   await api('POST', `/api/receipt/${id}/poll`, { itemIds: [items[0].id] });
-  db.prepare("UPDATE receipt SET telegram_poll_id = 'b8poll', poll_closes_at = ? WHERE id = ?")
-    .run(Math.floor(Date.now() / 1000) - 5, id);
+  db.prepare("UPDATE poll SET telegram_poll_id = 'b8poll' WHERE receipt_id = ? AND part = 1").run(id);
+  db.prepare('UPDATE receipt SET poll_closes_at = ? WHERE id = ?').run(Math.floor(Date.now() / 1000) - 5, id);
   await voteAs(ms[1], 7004, 'b8poll', [0]);
   assert.equal(d.optOuts(db, id).length, 0);
 });
@@ -433,7 +432,7 @@ test('B29: a vote from someone not in the group is ignored and does not enrol th
   const house = d.firstHousehold(db);
   const { id, items } = await mkReceipt('B29 Mart', [{ name: 'Wine', priceCents: 3000 }]);
   await api('POST', `/api/receipt/${id}/poll`, { itemIds: [items[0].id] });
-  db.prepare("UPDATE receipt SET telegram_poll_id = 'b29poll' WHERE id = ?").run(id);
+  db.prepare("UPDATE poll SET telegram_poll_id = 'b29poll' WHERE receipt_id = ? AND part = 1").run(id);
   db.prepare('UPDATE household SET telegram_chat_id = ? WHERE id = ?').run('-100', house.id);
   const before = d.members(db, house.id).length;
   const vote = (uid) => handleUpdate({ poll_answer: { poll_id: 'b29poll', user: { id: uid, first_name: 'X' }, option_ids: [0] } });
@@ -552,7 +551,7 @@ test('B14: a new poll clears the previous opt-outs and voters', async () => {
   const { id, items } = await mkReceipt('B14 Mart', [{ name: 'Wine', priceCents: 3000 }, { name: 'Rice', priceCents: 500 }]);
   const ms = (await api('GET', '/api/state')).body.members;
   await api('POST', `/api/receipt/${id}/poll`, { itemIds: [items[0].id] });
-  db.prepare("UPDATE receipt SET telegram_poll_id = 'b14poll' WHERE id = ?").run(id);
+  db.prepare("UPDATE poll SET telegram_poll_id = 'b14poll' WHERE receipt_id = ? AND part = 1").run(id);
   await voteAs(ms[1], 7014, 'b14poll', [0]);
   assert.equal(d.optOuts(db, id).length, 1);
   await api('POST', `/api/receipt/${id}/close-poll`);
@@ -597,7 +596,7 @@ test('B37: a vote that lands after the receipt is locked during the group check 
   const house = d.firstHousehold(db);
   const { id, items } = await mkReceipt('B37a Mart', [{ name: 'Wine', priceCents: 3000 }]);
   await api('POST', `/api/receipt/${id}/poll`, { itemIds: [items[0].id] });
-  db.prepare("UPDATE receipt SET telegram_poll_id = 'b37a' WHERE id = ?").run(id);
+  db.prepare("UPDATE poll SET telegram_poll_id = 'b37a' WHERE receipt_id = ? AND part = 1").run(id);
   db.prepare('UPDATE household SET telegram_chat_id = ? WHERE id = ?').run('-100', house.id);
   try {
     tg.isInChat = async () => {
@@ -618,7 +617,7 @@ test('B37: one user\'s vote then quick retraction apply in order', async () => {
   const house = d.firstHousehold(db);
   const { id, items } = await mkReceipt('B37b Mart', [{ name: 'Wine', priceCents: 3000 }, { name: 'Rice', priceCents: 500 }]);
   await api('POST', `/api/receipt/${id}/poll`, { itemIds: [items[0].id, items[1].id] });
-  db.prepare("UPDATE receipt SET telegram_poll_id = 'b37b' WHERE id = ?").run(id);
+  db.prepare("UPDATE poll SET telegram_poll_id = 'b37b' WHERE receipt_id = ? AND part = 1").run(id);
   db.prepare('UPDATE household SET telegram_chat_id = ? WHERE id = ?').run('-100', house.id);
   let calls = 0;
   try {
@@ -652,4 +651,529 @@ test('B38: odd quantity / aiGuess / name values are coerced, not a 500', async (
   assert.equal(b.ai_guess.length, 200);
   assert.equal(c.quantity, null);
   assert.equal((await api('GET', '/api/state')).status, 200);
+});
+
+// ── F1: several linked polls per receipt ────────────────────────────────────
+
+const tgMod = require('./telegram.js');
+const { auth } = require('./server.js');
+// Pretend we're live: stub Telegram, and hand out poll ids / message ids.
+async function withTelegram(fn, { failAt = null } = {}) {
+  const real = { s: tgMod.sendPoll, x: tgMod.stopPoll, c: tgMod.isInChat, v: tgMod.verifyInitData };
+  const house = d.firstHousehold(db);
+  const sent = [];
+  const stopped = [];
+  let n = 0;
+  tgMod.sendPoll = async (_t, _c, question, options) => {
+    if (failAt !== null && sent.length === failAt) throw new Error('boom');
+    n++;
+    const rec = { question, options, poll: { id: 'f1-' + process.hrtime.bigint() + '-' + n }, message_id: 1000 + n };
+    sent.push(rec);
+    return rec;
+  };
+  tgMod.stopPoll = async (_t, _c, mid) => { stopped.push(mid); };
+  tgMod.isInChat = async () => true;
+  tgMod.verifyInitData = () => ({ id: 7777 }); // the API caller, Ben, as a verified Telegram user
+  db.prepare('UPDATE member SET telegram_user_id = ? WHERE id = ?').run('7777', d.members(db, house.id)[0].id);
+  db.prepare('UPDATE household SET telegram_chat_id = ? WHERE id = ?').run('-100', house.id);
+  auth.dev = false; auth.token = 'tok';
+  try { return await fn({ sent, stopped }); } finally {
+    auth.dev = true; auth.token = '';
+    tgMod.sendPoll = real.s; tgMod.stopPoll = real.x; tgMod.isInChat = real.c; tgMod.verifyInitData = real.v;
+    db.prepare('UPDATE household SET telegram_chat_id = NULL WHERE id = ?').run(house.id);
+  }
+}
+// In non-DEV mode the API needs initData; the tests call the HTTP API in DEV, so flip only around Telegram calls.
+// (withTelegram flips auth.dev, so API requests inside it are authenticated as a verified Telegram user.)
+const manyItems = (n) => Array.from({ length: n }, (_, i) => ({ name: 'Thing ' + i, priceCents: 100 + i }));
+const answerAs = async (member, pollTid, optionIds) => {
+  db.prepare('UPDATE member SET telegram_user_id = ? WHERE id = ?').run(String(8000 + member.id), member.id);
+  await handleUpdate({ poll_answer: { poll_id: pollTid, user: { id: 8000 + member.id }, option_ids: optionIds } });
+};
+
+test('F1: 20 items become 3 polls of 7/7/6 with the right option->item mapping and the extra option', async () => {
+  await withTelegram(async ({ sent }) => {
+    const { id, items } = await mkReceipt('F1 Mart', manyItems(20));
+    const res = await api('POST', `/api/receipt/${id}/poll`, { itemIds: items.map((i) => i.id) });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.pollCount, 3);
+    assert.deepEqual(res.body.polls.map((p) => p.itemIds.length), [7, 7, 6]);
+    assert.deepEqual(res.body.polls.map((p) => p.part), [1, 2, 3]);
+    assert.deepEqual(res.body.polls.flatMap((p) => p.itemIds), items.map((i) => i.id), 'receipt order preserved');
+    assert.equal(sent.length, 3);
+    assert.deepEqual(sent.map((s) => s.options.length), [8, 8, 7]);
+    assert.equal(sent[0].options.at(-1), "✅ I'm in on all of these");
+    assert.match(sent[1].question, /2 of 3: tick anything you're NOT in on/);
+    assert.ok(sent.every((s) => s.question.length <= 300));
+    const polls = d.polls(db, id);
+    const mapped = d.polledItems(db, id).filter((m) => m.poll_id === polls[1].id).sort((a, b) => a.option_index - b.option_index);
+    assert.deepEqual(mapped.map((m) => m.item_id), res.body.polls[1].itemIds, 'option k is the k-th item of the part');
+  });
+});
+
+test('F1: 9 items stay one poll (no "k of N"), a 1-item poll has 2 options', async () => {
+  await withTelegram(async ({ sent }) => {
+    const nine = await mkReceipt('F1 nine', manyItems(9));
+    const r9 = await api('POST', `/api/receipt/${nine.id}/poll`, { itemIds: nine.items.map((i) => i.id) });
+    assert.equal(r9.body.pollCount, 1);
+    assert.equal(sent[0].options.length, 10);
+    assert.doesNotMatch(sent[0].question, / of 1/);
+    const one = await mkReceipt('F1 one', manyItems(2));
+    const r1 = await api('POST', `/api/receipt/${one.id}/poll`, { itemIds: [one.items[0].id] });
+    assert.equal(r1.status, 200);
+    assert.equal(sent[1].options.length, 2);
+  });
+});
+
+test('F1: votes are per poll; retracting in poll 1 leaves poll 2; voterIds needs every poll', async () => {
+  await withTelegram(async () => {
+    const { id, items } = await mkReceipt('F1 votes', manyItems(14)); // 7 + 7
+    const view = (await api('POST', `/api/receipt/${id}/poll`, { itemIds: items.map((i) => i.id) })).body;
+    const [p1, p2] = d.polls(db, id);
+    const aisha = (await api('GET', '/api/state')).body.members[1];
+    const a2 = view.polls[1];
+
+    await answerAs(aisha, p2.telegram_poll_id, [0, 1]);
+    let v = (await api('GET', `/api/receipt/${id}`)).body;
+    assert.deepEqual(v.optOuts.map((o) => o.itemId).sort(), a2.itemIds.slice(0, 2).sort());
+    assert.deepEqual(v.voteProgress, { [aisha.id]: 1 });
+    assert.deepEqual(v.voterIds, [], 'one of two polls is not fully voted');
+
+    await answerAs(aisha, p1.telegram_poll_id, [2]);
+    v = (await api('GET', `/api/receipt/${id}`)).body;
+    assert.equal(v.optOuts.length, 3, 'a poll 1 vote did not touch poll 2');
+    assert.deepEqual(v.voterIds, [aisha.id]);
+    assert.equal(v.voteProgress[aisha.id], 2);
+
+    await answerAs(aisha, p1.telegram_poll_id, []); // retract poll 1 only
+    v = (await api('GET', `/api/receipt/${id}`)).body;
+    assert.deepEqual(v.optOuts.map((o) => o.itemId).sort(), a2.itemIds.slice(0, 2).sort(), 'poll 2 opt-outs intact');
+    assert.deepEqual(v.voterIds, [], 'a retraction is not a vote');
+  });
+});
+
+test('F1: "in on all of these" alone is a vote with no opt-outs; with items, the items win', async () => {
+  await withTelegram(async () => {
+    const { id, items } = await mkReceipt('F1 inall', manyItems(3));
+    await api('POST', `/api/receipt/${id}/poll`, { itemIds: items.map((i) => i.id) });
+    const [p] = d.polls(db, id);
+    const ms = (await api('GET', '/api/state')).body.members;
+    await answerAs(ms[1], p.telegram_poll_id, [3]); // the extra option
+    let v = (await api('GET', `/api/receipt/${id}`)).body;
+    assert.equal(v.optOuts.length, 0);
+    assert.deepEqual(v.voterIds, [ms[1].id]);
+    await answerAs(ms[2], p.telegram_poll_id, [0, 3]);
+    v = (await api('GET', `/api/receipt/${id}`)).body;
+    assert.deepEqual(v.optOuts.map((o) => [o.itemId, o.memberId]), [[items[0].id, ms[2].id]]);
+  });
+});
+
+test('F1: if sending poll 2 fails, poll 1 is stopped, nothing is saved, 502', async () => {
+  await withTelegram(async ({ sent, stopped }) => {
+    const { id, items } = await mkReceipt('F1 fail', manyItems(14));
+    const res = await api('POST', `/api/receipt/${id}/poll`, { itemIds: items.map((i) => i.id) });
+    assert.equal(res.status, 502);
+    assert.equal(sent.length, 1);
+    assert.deepEqual(stopped, [sent[0].message_id]);
+    assert.equal(d.polls(db, id).length, 0);
+    assert.equal(d.polledItems(db, id).length, 0);
+    assert.equal(d.receipt(db, id).status, 'review');
+  }, { failAt: 1 });
+});
+
+test('F1: closing stops every Telegram poll of the receipt', async () => {
+  await withTelegram(async ({ sent, stopped }) => {
+    const { id, items } = await mkReceipt('F1 close', manyItems(20));
+    await api('POST', `/api/receipt/${id}/poll`, { itemIds: items.map((i) => i.id) });
+    const closed = await api('POST', `/api/receipt/${id}/close-poll`);
+    assert.equal(closed.body.receipt.status, 'review');
+    assert.equal(stopped.length, 3);
+    assert.deepEqual([...stopped].sort(), sent.map((s) => s.message_id).sort());
+  });
+});
+
+test('F1 migration: a single-poll database moves to the poll table, idempotently', () => {
+  const p = path.join(os.tmpdir(), 'grosplit-f1mig-' + process.pid + '.db');
+  const { DatabaseSync } = require('node:sqlite');
+  const old = new DatabaseSync(p);
+  old.exec(`
+    PRAGMA foreign_keys = ON;
+    CREATE TABLE household (id INTEGER PRIMARY KEY, name TEXT NOT NULL, telegram_chat_id TEXT UNIQUE,
+      poll_window_hours INTEGER NOT NULL DEFAULT 4, auto_flag_staples INTEGER NOT NULL DEFAULT 1,
+      round_to_cent INTEGER NOT NULL DEFAULT 1, currency TEXT NOT NULL DEFAULT '$');
+    CREATE TABLE member (id INTEGER PRIMARY KEY, household_id INTEGER NOT NULL REFERENCES household(id) ON DELETE CASCADE,
+      name TEXT NOT NULL, initial TEXT NOT NULL, avatar_color TEXT NOT NULL, telegram_handle TEXT, telegram_user_id TEXT UNIQUE);
+    CREATE TABLE receipt (id INTEGER PRIMARY KEY, household_id INTEGER NOT NULL REFERENCES household(id) ON DELETE CASCADE,
+      store TEXT NOT NULL, created_at INTEGER NOT NULL, grocer_id INTEGER NOT NULL REFERENCES member(id),
+      tax_cents INTEGER NOT NULL DEFAULT 0, tax_enabled INTEGER NOT NULL DEFAULT 1, tax_mode TEXT NOT NULL DEFAULT 'pro',
+      status TEXT NOT NULL DEFAULT 'review', telegram_poll_id TEXT, poll_message_id INTEGER, poll_closes_at INTEGER,
+      printed_total_cents INTEGER);
+    CREATE TABLE item (id INTEGER PRIMARY KEY, receipt_id INTEGER NOT NULL REFERENCES receipt(id) ON DELETE CASCADE,
+      name TEXT NOT NULL, price_cents INTEGER NOT NULL, quantity REAL, ai_flagged INTEGER NOT NULL DEFAULT 0,
+      ai_guess TEXT, position INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE polled_item (receipt_id INTEGER NOT NULL REFERENCES receipt(id) ON DELETE CASCADE,
+      item_id INTEGER NOT NULL REFERENCES item(id) ON DELETE CASCADE, option_index INTEGER NOT NULL,
+      PRIMARY KEY (receipt_id, item_id));
+    CREATE TABLE opt_out (receipt_id INTEGER NOT NULL REFERENCES receipt(id) ON DELETE CASCADE,
+      item_id INTEGER NOT NULL REFERENCES item(id) ON DELETE CASCADE,
+      member_id INTEGER NOT NULL REFERENCES member(id) ON DELETE CASCADE, PRIMARY KEY (receipt_id, item_id, member_id));
+    CREATE TABLE poll_voter (receipt_id INTEGER NOT NULL REFERENCES receipt(id) ON DELETE CASCADE,
+      member_id INTEGER NOT NULL REFERENCES member(id) ON DELETE CASCADE, voted_at INTEGER NOT NULL,
+      PRIMARY KEY (receipt_id, member_id));
+    INSERT INTO household (id, name) VALUES (1, 'h');
+    INSERT INTO member VALUES (1, 1, 'A', 'A', '#000', NULL, NULL), (2, 1, 'B', 'B', '#111', NULL, NULL);
+    INSERT INTO receipt (id, household_id, store, created_at, grocer_id, status, telegram_poll_id, poll_message_id, poll_closes_at)
+      VALUES (1, 1, 'polled', 0, 1, 'polling', 'oldpoll', 55, 9999999999), (2, 1, 'plain', 0, 1, 'review', NULL, NULL, NULL);
+    INSERT INTO item (id, receipt_id, name, price_cents) VALUES (10, 1, 'a', 100), (11, 1, 'b', 200), (12, 2, 'c', 300);
+    INSERT INTO polled_item VALUES (1, 10, 0), (1, 11, 1);
+    INSERT INTO opt_out VALUES (1, 10, 2);
+    INSERT INTO poll_voter VALUES (1, 2, 123);
+  `);
+  old.close();
+  for (let pass = 0; pass < 2; pass++) { // the second open proves idempotence
+    const mig = d.open(p);
+    const polls = mig.prepare('SELECT * FROM poll').all();
+    assert.equal(polls.length, 1, 'only the receipt that had a poll');
+    assert.equal(polls[0].receipt_id, 1);
+    assert.equal(polls[0].part, 1);
+    assert.equal(polls[0].telegram_poll_id, 'oldpoll');
+    assert.equal(polls[0].message_id, 55);
+    assert.deepEqual(mig.prepare('SELECT poll_id FROM polled_item').all().map((r) => r.poll_id), [polls[0].id, polls[0].id]);
+    assert.deepEqual(mig.prepare('SELECT poll_id, member_id, voted_at FROM poll_voter').all().map((r) => ({ ...r })),
+      [{ poll_id: polls[0].id, member_id: 2, voted_at: 123 }]);
+    assert.equal(mig.prepare('SELECT COUNT(*) n FROM opt_out').get().n, 1, 'opt-outs untouched');
+    mig.close();
+  }
+  for (const suffix of ['', '-wal', '-shm']) fs.rmSync(p + suffix, { force: true, maxRetries: 5, retryDelay: 100 });
+});
+
+// ── F1 follow-ups ───────────────────────────────────────────────────────────
+
+test('POST /poll: two concurrent requests cannot both send (second gets 409, nothing orphaned)', async () => {
+  await withTelegram(async ({ sent }) => {
+    const slow = tgMod.sendPoll;
+    tgMod.sendPoll = async (...a) => { await new Promise((r) => setTimeout(r, 60)); return slow(...a); };
+    const { id, items } = await mkReceipt('Race Mart', manyItems(3));
+    const body = { itemIds: items.map((i) => i.id) };
+    const [a, b] = await Promise.all([api('POST', `/api/receipt/${id}/poll`, body), api('POST', `/api/receipt/${id}/poll`, body)]);
+    assert.deepEqual([a.status, b.status].sort(), [200, 409]);
+    assert.equal(sent.length, 1, 'only one set was sent');
+    assert.equal(d.polls(db, id)[0].message_id, sent[0].message_id, 'and it is the tracked one');
+  });
+});
+
+test('POST /poll: a failure after sending (item deleted mid-send) stops the polls and frees the receipt', async () => {
+  await withTelegram(async ({ sent, stopped }) => {
+    const { id, items } = await mkReceipt('Mid Mart', manyItems(3));
+    const real = tgMod.sendPoll;
+    tgMod.sendPoll = async (...a) => {
+      const r = await real(...a);
+      db.prepare('DELETE FROM item WHERE id = ?').run(items[0].id); // FK error when saving the mapping
+      return r;
+    };
+    const res = await api('POST', `/api/receipt/${id}/poll`, { itemIds: items.map((i) => i.id) });
+    assert.equal(res.status, 500);
+    assert.deepEqual(stopped, sent.map((s) => s.message_id));
+    assert.equal(d.receipt(db, id).status, 'review');
+    assert.equal(d.polls(db, id).length, 0);
+  });
+});
+
+test("a stale 'posting' receipt is handed back to review", async () => {
+  const { id } = await mkReceipt('Stuck Mart', manyItems(2));
+  db.prepare("UPDATE receipt SET status = 'posting', poll_closes_at = ? WHERE id = ?").run(Math.floor(Date.now() / 1000) - 300, id);
+  await api('GET', '/api/state');
+  assert.equal(d.receipt(db, id).status, 'review');
+  assert.equal(d.receipt(db, id).poll_closes_at, null);
+});
+
+test('more than 15 polls is a friendly 400', async () => {
+  const { id, items } = await mkReceipt('Huge Mart', manyItems(136)); // 136 / 9 -> 16 polls
+  const res = await api('POST', `/api/receipt/${id}/poll`, { itemIds: items.map((i) => i.id) });
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /more than 15 polls/);
+  assert.equal(d.receipt(db, id).status, 'review', 'not claimed');
+});
+
+test('retraction (empty answer) deletes the poll_voter row; an answer re-adds it', async () => {
+  await withTelegram(async () => {
+    const { id, items } = await mkReceipt('Retract Mart', manyItems(2));
+    await api('POST', `/api/receipt/${id}/poll`, { itemIds: items.map((i) => i.id) });
+    const [p] = d.polls(db, id);
+    const aisha = (await api('GET', '/api/state')).body.members[1];
+    await answerAs(aisha, p.telegram_poll_id, [0]);
+    assert.equal(d.voters(db, id).length, 1);
+    await answerAs(aisha, p.telegram_poll_id, []);
+    assert.equal(d.voters(db, id).length, 0);
+    assert.equal(d.optOuts(db, id).length, 0);
+    await answerAs(aisha, p.telegram_poll_id, [2]);
+    assert.equal(d.voters(db, id).length, 1);
+  });
+});
+
+test('refuses to start off Fly without DATABASE_PATH (cannot silently open the live db)', () => {
+  const { spawnSync } = require('node:child_process');
+  const env = { ...process.env, TELEGRAM_BOT_TOKEN: 'x:y', PORT: '0' };
+  delete env.DEV; delete env.DATABASE_PATH; delete env.FLY_APP_NAME;
+  const r = spawnSync(process.execPath, ['server.js'], { cwd: __dirname, env, encoding: 'utf8', timeout: 5000 });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /DATABASE_PATH/);
+});
+
+test('sign-in rejection logging is limited to one line per reason per minute', () => {
+  const { warnOncePerMinute } = require('./server.js');
+  const real = console.warn;
+  const lines = [];
+  console.warn = (m) => lines.push(m);
+  try {
+    for (let i = 0; i < 5; i++) warnOncePerMinute('sign-in rejected: test-reason-A');
+    warnOncePerMinute('sign-in rejected: test-reason-B');
+  } finally { console.warn = real; }
+  assert.deepEqual(lines, ['sign-in rejected: test-reason-A', 'sign-in rejected: test-reason-B']);
+});
+
+// ── send-window gate fixes ──────────────────────────────────────────────────
+
+test('B48: confirm / close are refused while posting, and the commit cannot overwrite a lock', async () => {
+  await withTelegram(async ({ stopped }) => {
+    const { id, items } = await mkReceipt('B48 Mart', manyItems(3));
+    const real = tgMod.sendPoll;
+    let during;
+    tgMod.sendPoll = async (...a) => {
+      const r = await real(...a);
+      during = [await api('POST', `/api/receipt/${id}/confirm`), await api('POST', `/api/receipt/${id}/close-poll`)];
+      return r;
+    };
+    const ok1 = await api('POST', `/api/receipt/${id}/poll`, { itemIds: items.map((i) => i.id) });
+    assert.equal(ok1.status, 200);
+    assert.deepEqual(during.map((x) => x.status), [409, 409]);
+    assert.equal(d.receipt(db, id).status, 'polling');
+
+    // Even if something did lock it mid-send, the commit must not overwrite that.
+    const two = await mkReceipt('B48b Mart', manyItems(3));
+    tgMod.sendPoll = async (...a) => {
+      const r = await real(...a);
+      db.prepare("UPDATE receipt SET status = 'confirmed' WHERE id = ?").run(two.id);
+      return r;
+    };
+    const res = await api('POST', `/api/receipt/${two.id}/poll`, { itemIds: two.items.map((i) => i.id) });
+    assert.equal(res.status, 409);
+    assert.equal(d.receipt(db, two.id).status, 'confirmed', 'lock not undone');
+    assert.equal(stopped.length, 1, 'the poll that went out was stopped');
+  });
+});
+
+test('B49: a vote on poll 1 while poll 2 is still sending is kept; a failure removes everything', async () => {
+  await withTelegram(async ({ sent }) => {
+    const { id, items } = await mkReceipt('B49 Mart', manyItems(14));
+    const aisha = (await api('GET', '/api/state')).body.members[1];
+    const real = tgMod.sendPoll;
+    tgMod.sendPoll = async (...a) => {
+      if (sent.length === 1) { // poll 1 is out, poll 2 is about to be sent
+        await answerAs(aisha, sent[0].poll.id, [0]);
+      }
+      return real(...a);
+    };
+    const res = await api('POST', `/api/receipt/${id}/poll`, { itemIds: items.map((i) => i.id) });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.optOuts.length, 1, 'early vote survived');
+    assert.deepEqual(res.body.voteProgress, { [aisha.id]: 1 });
+
+    // Failure after an early vote: opt-outs, voters and poll rows are all gone.
+    const two = await mkReceipt('B49b Mart', manyItems(14));
+    let n = 0;
+    tgMod.sendPoll = async (...a) => {
+      if (n++ === 1) {
+        await answerAs(aisha, sent.at(-1).poll.id, [0]);
+        throw new Error('boom');
+      }
+      return real(...a);
+    };
+    const bad = await api('POST', `/api/receipt/${two.id}/poll`, { itemIds: two.items.map((i) => i.id) });
+    assert.equal(bad.status, 502);
+    assert.equal(d.optOuts(db, two.id).length, 0);
+    assert.equal(d.voters(db, two.id).length, 0);
+    assert.equal(d.polls(db, two.id).length, 0);
+    assert.equal(d.receipt(db, two.id).status, 'review');
+  });
+});
+
+test('B50: Telegram calls carry a timeout signal; a stale posting receipt has its polls stopped and deleted', async () => {
+  const realFetch = globalThis.fetch;
+  let init;
+  globalThis.fetch = async (_u, i) => { init = i; return { json: async () => ({ ok: true, result: 1 }) }; };
+  try { await tgMod.call('t', 'getMe'); } finally { globalThis.fetch = realFetch; }
+  assert.ok(init.signal instanceof AbortSignal);
+
+  await withTelegram(async ({ stopped }) => {
+    const { id } = await mkReceipt('Stale Mart', manyItems(2));
+    db.prepare('INSERT INTO poll (receipt_id, part, telegram_poll_id, message_id) VALUES (?, 1, ?, ?)').run(id, 'stale-tid', 4242);
+    db.prepare("UPDATE receipt SET status = 'posting', poll_closes_at = ? WHERE id = ?").run(Math.floor(Date.now() / 1000) - 400, id);
+    await api('GET', '/api/state');
+    assert.equal(d.receipt(db, id).status, 'review');
+    assert.equal(d.polls(db, id).length, 0);
+    assert.deepEqual(stopped, [4242]);
+  });
+});
+
+// ── group setup: logging, replies, /start ───────────────────────────────────
+
+const startMsg = (chatId, title, text = '/start@gro_split_bot') => ({
+  update_id: 1,
+  message: { chat: { id: chatId, type: 'supergroup', title }, from: { id: 5, first_name: 'Secret Name' }, text },
+});
+
+test('groups: /start links the household and replies; /start again reports; a second group is told once', async () => {
+  const house = d.firstHousehold(db);
+  const was = { name: house.name, chat: house.telegram_chat_id };
+  const replies = [];
+  const logs = [];
+  const real = { m: tgMod.sendMessage, l: console.log };
+  tgMod.sendMessage = async (_t, chat, text) => { replies.push([chat, text]); return { message_id: 1 }; };
+  console.log = (...a) => logs.push(a.join(' '));
+  auth.dev = false; auth.token = 'tok';
+  db.prepare('UPDATE household SET telegram_chat_id = NULL WHERE id = ?').run(house.id);
+  try {
+    await handleUpdate(startMsg(-500, 'Watertown Family'));
+    assert.equal(d.firstHousehold(db).telegram_chat_id, '-500');
+    assert.deepEqual(replies.at(-1), [-500, '✅ GroSplit is set up for Watertown Family. Everyone tap the button above once to join.']);
+
+    await handleUpdate(startMsg(-500, 'Watertown Family'));
+    const n = d.members(db, house.id).length;
+    assert.match(replies.at(-1)[1], new RegExp('set up here — ' + n + ' housemates have joined'));
+
+    const before = replies.length;
+    await handleUpdate(startMsg(-501, 'Other Group'));
+    assert.deepEqual(replies.at(-1), [-501, "I'm already set up for another group."]);
+    await handleUpdate(startMsg(-501, 'Other Group'));
+    assert.equal(replies.length, before + 1, 'told only once');
+    assert.equal(d.firstHousehold(db).telegram_chat_id, '-500', 'not re-linked');
+
+    assert.ok(logs.includes('update: message from supergroup "Watertown Family"'), logs.join('\n'));
+    assert.ok(!logs.join('\n').includes('Secret Name'), 'no names in logs');
+    assert.ok(!logs.join('\n').includes('/start'), 'no message text in logs');
+  } finally {
+    tgMod.sendMessage = real.m; console.log = real.l;
+    auth.dev = true; auth.token = '';
+    db.prepare('UPDATE household SET telegram_chat_id = ?, name = ? WHERE id = ?').run(was.chat, was.name, house.id);
+  }
+});
+
+test('groups: on an empty database /start@bot in a group creates the household and replies', () => {
+  const { spawnSync } = require('node:child_process');
+  const script = `
+    const server = require('./server.js'); const tg = require('./telegram.js');
+    const replies = []; tg.sendMessage = async (_t, c, t) => { replies.push([c, t]); return { message_id: 1 }; };
+    server.auth.dev = false; server.auth.token = 'x:y';
+    (async () => {
+      console.log = () => {};
+      await server.handleUpdate({ update_id: 1, message: { chat: { id: -9, type: 'supergroup', title: 'Watertown Family' }, text: '/start@gro_split_bot' } });
+      const h = server.db.prepare('SELECT * FROM household').all();
+      process.stdout.write(JSON.stringify({ h, replies }));
+      process.exit(0);
+    })();`;
+  const db2 = path.join(os.tmpdir(), 'grosplit-grp-' + process.pid + '.db');
+  const env = { ...process.env, TELEGRAM_BOT_TOKEN: 'x:y', DATABASE_PATH: db2 };
+  delete env.DEV; delete env.FLY_APP_NAME;
+  const r = spawnSync(process.execPath, ['-e', script], { cwd: __dirname, env, encoding: 'utf8', timeout: 10000 });
+  for (const suffix of ['', '-wal', '-shm']) fs.rmSync(db2 + suffix, { force: true, maxRetries: 5, retryDelay: 100 });
+  const out = JSON.parse(r.stdout);
+  assert.equal(out.h.length, 1);
+  assert.equal(out.h[0].name, 'Watertown Family');
+  assert.equal(out.h[0].telegram_chat_id, '-9');
+  assert.deepEqual(out.replies, [[-9, '✅ GroSplit is set up for Watertown Family. Everyone tap the button above once to join.']]);
+});
+
+test('the long-poll loop asks Telegram for message updates (commands reach handleUpdate)', () => {
+  assert.ok(require('node:fs').readFileSync(path.join(__dirname, 'server.js'), 'utf8')
+    .includes("const POLL_UPDATES = ['message', 'poll_answer', 'my_chat_member']"));
+});
+
+// ── group linking gate fixes ────────────────────────────────────────────────
+
+async function withGroupStubs(fn) {
+  const house = d.firstHousehold(db);
+  const was = { name: house.name, chat: house.telegram_chat_id };
+  const replies = [];
+  const logs = [];
+  const real = { m: tgMod.sendMessage, l: console.log, c: tgMod.getChatMember, p: tgMod.pinChatMessage };
+  tgMod.sendMessage = async (_t, chat, text, extra) => { replies.push({ chat, text, button: !!(extra && extra.reply_markup) }); return { message_id: 1 }; };
+  tgMod.getChatMember = async () => ({ status: 'member' });
+  tgMod.pinChatMessage = async () => {};
+  console.log = (...a) => logs.push(a.join(' '));
+  auth.dev = false; auth.token = 'tok';
+  try { return await fn({ house, replies, logs }); } finally {
+    tgMod.sendMessage = real.m; tgMod.getChatMember = real.c; tgMod.pinChatMessage = real.p; console.log = real.l;
+    auth.dev = true; auth.token = '';
+    delete process.env.TELEGRAM_OWNER_ID;
+    require('./server.js')._setBotForTests('', null);
+    db.prepare('UPDATE household SET telegram_chat_id = ?, name = ? WHERE id = ?').run(was.chat, was.name, house.id);
+  }
+}
+const grp = (id, type = 'supergroup', title = 'G') => ({ id, type, title });
+const added = (chat, fromId) => ({
+  update_id: 1,
+  my_chat_member: { chat, from: { id: fromId }, old_chat_member: { status: 'left' }, new_chat_member: { status: 'member' } },
+});
+
+test('migration: a basic group becoming a supergroup keeps the household linked', async () => {
+  await withGroupStubs(async ({ house, replies }) => {
+    db.prepare('UPDATE household SET telegram_chat_id = ? WHERE id = ?').run('-600', house.id);
+    await handleUpdate({ message: { chat: grp(-600, 'group'), migrate_to_chat_id: -1006 } });
+    assert.equal(d.firstHousehold(db).telegram_chat_id, '-1006');
+    await handleUpdate({ message: { chat: grp(-1006), text: '/start' } });
+    assert.match(replies.at(-1).text, /set up here/, 'not told "another group"');
+
+    // The other direction (the supergroup's own migrate_from message).
+    db.prepare('UPDATE household SET telegram_chat_id = ? WHERE id = ?').run('-700', house.id);
+    await handleUpdate({ message: { chat: grp(-1007), migrate_from_chat_id: -700 } });
+    assert.equal(d.firstHousehold(db).telegram_chat_id, '-1007');
+    // A migration of some other chat changes nothing.
+    await handleUpdate({ message: { chat: grp(-800, 'group'), migrate_to_chat_id: -1008 } });
+    assert.equal(d.firstHousehold(db).telegram_chat_id, '-1007');
+  });
+});
+
+test('TELEGRAM_OWNER_ID: only the owner can create or link the household', async () => {
+  await withGroupStubs(async ({ house, replies }) => {
+    process.env.TELEGRAM_OWNER_ID = '42';
+    db.prepare('UPDATE household SET telegram_chat_id = NULL WHERE id = ?').run(house.id);
+    await handleUpdate({ message: { chat: grp(-900), from: { id: 7 }, text: '/start' } });
+    await handleUpdate(added(grp(-900), 7));
+    assert.equal(d.firstHousehold(db).telegram_chat_id, null, 'a stranger cannot claim it');
+    assert.equal(replies.length, 0, 'and gets no reply');
+    await handleUpdate(added(grp(-900), 42));
+    assert.equal(d.firstHousehold(db).telegram_chat_id, '-900');
+    assert.ok(replies.length >= 1);
+  });
+});
+
+test('a stranger group is told once and never greeted or pinned, even when re-added', async () => {
+  await withGroupStubs(async ({ house, replies }) => {
+    require('./server.js')._setBotForTests('gro_test_bot', 99);
+    db.prepare('UPDATE household SET telegram_chat_id = ? WHERE id = ?').run('-500', house.id);
+    for (let i = 0; i < 3; i++) await handleUpdate(added(grp(-5001), 1));
+    await handleUpdate({ message: { chat: grp(-5001), from: { id: 1 }, text: '/start' } });
+    assert.equal(replies.length, 1);
+    assert.equal(replies[0].text, "I'm already set up for another group.");
+    assert.equal(replies.filter((r) => r.button).length, 0, 'no greeting button');
+  });
+});
+
+test('linking via /start also posts the greeting button before the setup reply', async () => {
+  await withGroupStubs(async ({ house, replies }) => {
+    require('./server.js')._setBotForTests('gro_test_bot', 99);
+    db.prepare('UPDATE household SET telegram_chat_id = NULL WHERE id = ?').run(house.id);
+    await handleUpdate({ message: { chat: grp(-950, 'supergroup', 'Home'), from: { id: 1 }, text: '/start' } });
+    assert.equal(replies[0].button, true, 'greeting with the button');
+    assert.match(replies[1].text, /set up for Home/);
+  });
+});
+
+test('group titles are quoted in logs so they cannot forge lines', async () => {
+  await withGroupStubs(async ({ logs }) => {
+    await handleUpdate({ message: { chat: grp(-960, 'supergroup', 'evil\nupdate: fake\u001b[31m'), text: 'hi' } });
+    const line = logs.find((l) => l.startsWith('update: message from supergroup'));
+    assert.ok(line && !line.includes('\n') && !line.includes('\u001b'), line);
+  });
 });

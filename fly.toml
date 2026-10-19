@@ -1,7 +1,7 @@
 # `app` must be globally unique on Fly — it becomes https://<app>.fly.dev,
 # which is the Mini App URL you give BotFather. Change it if this is taken.
 app = "grosplit-blk42"
-primary_region = "sin"
+primary_region = "iad"   # US East — the house is in Watertown, MA
 
 [build]
 

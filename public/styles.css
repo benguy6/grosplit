@@ -73,7 +73,7 @@ input { font: inherit; color: inherit; }
   min-height: 100dvh;
   max-width: 520px;
   margin: 0 auto;
-  overflow-x: hidden;
+  overflow-x: clip; /* not hidden: that makes #app a scroll container and breaks position: sticky */
 }
 
 .screen { display: flex; flex-direction: column; min-height: 100dvh; }
@@ -95,6 +95,7 @@ input { font: inherit; color: inherit; }
 /* Every currency figure. tabular-nums so decimals align down a column. */
 .money { font: 500 16px var(--mono); font-variant-numeric: tabular-nums; }
 .money-lg { font: 700 26px var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.mono-num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .money-hero { font: 700 40px/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -0.04em; }
 
 /* ── receipt paper ─────────────────────────────────────────────────────── */
@@ -170,7 +171,9 @@ input { font: inherit; color: inherit; }
 .btn-sage { background: var(--sage); color: #fff; }
 .btn-sage:hover { background: var(--sage-hover); }
 .btn-muted { background: var(--sage-muted); color: #fff; cursor: default; }
+.btn-sage[disabled] { background: var(--sage-muted); cursor: default; }
 .btn-ink { background: var(--ink); color: #fff; }
+.btn-ink[disabled] { opacity: .5; cursor: default; }
 .btn-quiet { height: 44px; color: var(--ink-60); font: 500 14px var(--ui); border-radius: 14px; }
 .btn-quiet:hover { background: var(--fill-hover-paper); }
 .btn-outline { background: var(--card); border: 1.5px solid var(--ink); height: 46px; border-radius: 13px; font: 600 14px var(--ui); }

@@ -15,3 +15,5 @@ uploads/
 *.err
 .polltest.js
 .verify.js
+backups/
+.host.pids

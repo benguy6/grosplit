@@ -43,11 +43,12 @@ function seedLivePoll() {
   const r = d.createReceipt(db, { householdId: house.id, store: 'Whole Foods', grocerId: ms[0].id });
   const items = d.replaceItems(db, r.id, seed.ACTIVE_ITEMS);
   const polled = items.slice(5, 8);
+  const pollId = db.prepare('INSERT INTO poll (receipt_id, part) VALUES (?, 1)').run(r.id).lastInsertRowid;
   polled.forEach((it, i) =>
-    db.prepare('INSERT INTO polled_item (receipt_id, item_id, option_index) VALUES (?, ?, ?)').run(r.id, it.id, i));
+    db.prepare('INSERT INTO polled_item (receipt_id, item_id, option_index, poll_id) VALUES (?, ?, ?, ?)').run(r.id, it.id, i, pollId));
   const now = Math.floor(Date.now() / 1000);
   for (const m of ms.slice(1, 4)) {
-    db.prepare('INSERT INTO poll_voter (receipt_id, member_id, voted_at) VALUES (?, ?, ?)').run(r.id, m.id, now);
+    db.prepare('INSERT INTO poll_voter (poll_id, member_id, voted_at) VALUES (?, ?, ?)').run(pollId, m.id, now);
   }
   db.prepare('INSERT INTO opt_out (receipt_id, item_id, member_id) VALUES (?, ?, ?)').run(r.id, polled[0].id, ms[1].id);
   db.prepare('INSERT INTO opt_out (receipt_id, item_id, member_id) VALUES (?, ?, ?)').run(r.id, polled[0].id, ms[3].id);

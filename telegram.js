@@ -16,8 +16,10 @@ const MAX_OPTION_CHARS = 100;
 
 const API = (token, method) => `https://api.telegram.org/bot${token}/${method}`;
 
-async function call(token, method, body) {
+// A hung Telegram call must fail, not hang the request (and the poll claim) forever.
+async function call(token, method, body, timeoutMs = 15000) {
   const res = await fetch(API(token, method), {
+    signal: AbortSignal.timeout(timeoutMs),
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body ?? {}),
@@ -48,10 +50,10 @@ function verifyInitData(initData, botToken, { maxAgeSeconds = 86400 } = {}) {
   const params = new URLSearchParams(initData);
   const hash = params.get('hash');
   if (!hash) throw new Error('initData has no hash');
+  // Only `hash` is left out. Newer clients also send `signature` (for Ed25519
+  // third-party validation); for this HMAC check it IS part of the payload —
+  // dropping it rejects every modern Telegram client.
   params.delete('hash');
-
-  // signature is present on newer clients and is NOT part of the hash payload
-  params.delete('signature');
 
   const checkString = [...params.entries()]
     .map(([k, v]) => `${k}=${v}`)
@@ -137,7 +139,7 @@ const setWebhook = (token, url, secretToken) =>
 const getWebhookInfo = (token) => call(token, 'getWebhookInfo', {});
 const deleteWebhook = (token) => call(token, 'deleteWebhook', {});
 const getUpdates = (token, offset, allowed) =>
-  call(token, 'getUpdates', { offset, timeout: 25, allowed_updates: allowed });
+  call(token, 'getUpdates', { offset, timeout: 25, allowed_updates: allowed }, 40000); // long poll
 
 module.exports = {
   MAX_POLL_OPTIONS, MAX_OPTION_CHARS,

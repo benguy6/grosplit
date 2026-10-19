@@ -59,10 +59,21 @@ CREATE TABLE IF NOT EXISTS item (
   position    INTEGER NOT NULL DEFAULT 0
 );
 
+-- One receipt can have several Telegram polls (max 9 items each), numbered by part.
+CREATE TABLE IF NOT EXISTS poll (
+  id               INTEGER PRIMARY KEY,
+  receipt_id       INTEGER NOT NULL REFERENCES receipt(id) ON DELETE CASCADE,
+  part             INTEGER NOT NULL,
+  telegram_poll_id TEXT    UNIQUE,
+  message_id       INTEGER
+);
+
+-- option_index is per poll.
 CREATE TABLE IF NOT EXISTS polled_item (
   receipt_id   INTEGER NOT NULL REFERENCES receipt(id) ON DELETE CASCADE,
   item_id      INTEGER NOT NULL REFERENCES item(id) ON DELETE CASCADE,
   option_index INTEGER NOT NULL,
+  poll_id      INTEGER REFERENCES poll(id) ON DELETE CASCADE,
   PRIMARY KEY (receipt_id, item_id)
 );
 
@@ -73,11 +84,12 @@ CREATE TABLE IF NOT EXISTS opt_out (
   PRIMARY KEY (receipt_id, item_id, member_id)
 );
 
+-- Who has answered which poll.
 CREATE TABLE IF NOT EXISTS poll_voter (
-  receipt_id INTEGER NOT NULL REFERENCES receipt(id) ON DELETE CASCADE,
-  member_id  INTEGER NOT NULL REFERENCES member(id) ON DELETE CASCADE,
-  voted_at   INTEGER NOT NULL,
-  PRIMARY KEY (receipt_id, member_id)
+  poll_id   INTEGER NOT NULL REFERENCES poll(id) ON DELETE CASCADE,
+  member_id INTEGER NOT NULL REFERENCES member(id) ON DELETE CASCADE,
+  voted_at  INTEGER NOT NULL,
+  PRIMARY KEY (poll_id, member_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_item_receipt   ON item(receipt_id, position);
@@ -109,6 +121,48 @@ function migrate(db) {
   // Receipts confirmed before freezing existed get frozen now, from today's members.
   const old = db.prepare("SELECT id FROM receipt WHERE status = 'confirmed' AND locked_split IS NULL").all();
   for (const r of old) freezeSplit(db, r.id);
+  migratePolls(db);
+}
+
+// Single-poll-per-receipt -> several polls. Idempotent: each step checks its own state.
+function migratePolls(db) {
+  const has = (t, c) => db.prepare(`PRAGMA table_info(${t})`).all().some((x) => x.name === c);
+  db.exec('BEGIN');
+  try {
+    if (!has('polled_item', 'poll_id')) {
+      db.exec('ALTER TABLE polled_item ADD COLUMN poll_id INTEGER REFERENCES poll(id) ON DELETE CASCADE');
+    }
+    // Every receipt that had a poll (or polled items) and no poll row yet gets part 1.
+    const pending = db.prepare(
+      `SELECT id, telegram_poll_id AS tid, poll_message_id AS mid FROM receipt r
+       WHERE NOT EXISTS (SELECT 1 FROM poll p WHERE p.receipt_id = r.id)
+         AND (telegram_poll_id IS NOT NULL OR EXISTS (SELECT 1 FROM polled_item pi WHERE pi.receipt_id = r.id))`,
+    ).all();
+    const taken = db.prepare('SELECT 1 FROM poll WHERE telegram_poll_id = ?');
+    const insPoll = db.prepare('INSERT INTO poll (receipt_id, part, telegram_poll_id, message_id) VALUES (?, 1, ?, ?)');
+    const attach = db.prepare('UPDATE polled_item SET poll_id = ? WHERE receipt_id = ?');
+    for (const r of pending) {
+      const tid = r.tid && !taken.get(r.tid) ? r.tid : null; // UNIQUE must never abort a boot
+      attach.run(insPoll.run(r.id, tid, r.mid).lastInsertRowid, r.id);
+    }
+    if (!has('poll_voter', 'poll_id')) {
+      db.exec('ALTER TABLE poll_voter RENAME TO poll_voter_old');
+      db.exec(`CREATE TABLE poll_voter (
+        poll_id   INTEGER NOT NULL REFERENCES poll(id) ON DELETE CASCADE,
+        member_id INTEGER NOT NULL REFERENCES member(id) ON DELETE CASCADE,
+        voted_at  INTEGER NOT NULL,
+        PRIMARY KEY (poll_id, member_id)
+      )`);
+      db.exec(`INSERT INTO poll_voter (poll_id, member_id, voted_at)
+               SELECT p.id, v.member_id, v.voted_at FROM poll_voter_old v
+               JOIN poll p ON p.receipt_id = v.receipt_id AND p.part = 1`);
+      db.exec('DROP TABLE poll_voter_old');
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
 }
 
 // The split for a receipt as it stands right now over the given members.
@@ -152,8 +206,24 @@ const polledItems = (db, receiptId) =>
 const optOuts = (db, receiptId) =>
   db.prepare('SELECT * FROM opt_out WHERE receipt_id = ?').all(receiptId);
 
+// One row per (poll, member) answered, across all of the receipt's polls.
 const voters = (db, receiptId) =>
-  db.prepare('SELECT * FROM poll_voter WHERE receipt_id = ?').all(receiptId);
+  db.prepare(
+    'SELECT v.poll_id, v.member_id, v.voted_at FROM poll_voter v JOIN poll p ON p.id = v.poll_id WHERE p.receipt_id = ?',
+  ).all(receiptId);
+
+const polls = (db, receiptId) =>
+  db.prepare('SELECT * FROM poll WHERE receipt_id = ? ORDER BY part').all(receiptId);
+
+const pollByTelegramId = (db, telegramPollId) =>
+  db.prepare('SELECT * FROM poll WHERE telegram_poll_id = ?').get(String(telegramPollId));
+
+// Forget a receipt's polls entirely: polls, their item mappings, voters and opt-outs.
+function clearPolls(db, receiptId) {
+  db.prepare('DELETE FROM opt_out WHERE receipt_id = ?').run(receiptId);
+  db.prepare('DELETE FROM polled_item WHERE receipt_id = ?').run(receiptId);
+  db.prepare('DELETE FROM poll WHERE receipt_id = ?').run(receiptId); // cascades poll_voter
+}
 
 const memberByTelegramId = (db, telegramUserId) =>
   db.prepare('SELECT * FROM member WHERE telegram_user_id = ?').get(String(telegramUserId));
@@ -255,6 +325,7 @@ function syncItems(db, receiptId, rows, knownIds) {
 module.exports = {
   open, PALETTE, SCHEMA, computeReceiptSplit, freezeSplit, syncItems,
   household, householdByChatId, firstHousehold,
-  members, items, receipt, receipts, polledItems, optOuts, voters, memberByTelegramId,
+  members, items, receipt, receipts, polledItems, optOuts, voters, polls, pollByTelegramId, clearPolls,
+  memberByTelegramId,
   addMember, createHousehold, createReceipt, replaceItems,
 };

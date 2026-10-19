@@ -68,6 +68,8 @@ const esc = (s) =>
 
 const cur = () => (S.data && S.data.household.currency) || '$';
 const fmt = (cents) => cur() + (cents / 100).toFixed(2);
+// Money inside Space Grotesk prose still has to be mono + tabular (SPEC §9).
+const mono = (cents) => '<span class="mono-num">' + fmt(cents) + '</span>';
 const upper = (s) => String(s || '').toUpperCase();
 
 const memberById = (id) => (S.data ? S.data.members.find((m) => m.id === id) : null);
@@ -183,6 +185,14 @@ async function putItems(items) {
 const shown = new Set();
 const fresh = (k) => { const n = !shown.has(k); shown.add(k); return n; };
 
+// Same balanced chunking as the server: ≤ 9 per poll, 14 → 7+7, 20 → 7+7+6.
+const POLL_MAX = 9;
+function pollSizes(n) {
+  if (!n) return [];
+  const parts = Math.ceil(n / POLL_MAX);
+  return Array.from({ length: parts }, (_, i) => Math.floor(n / parts) + (i < n % parts ? 1 : 0));
+}
+
 // ── flow strip ─────────────────────────────────────────────────────────────
 
 const FLOW = [
@@ -205,8 +215,8 @@ function flowReachable(id) {
   if (!v) return false;
   if (id === 'review') return v.receipt.status === 'review';
   if (id === 'poll') return v.items.length > 0 && v.receipt.status === 'review';
-  if (id === 'live') return v.receipt.status === 'polling' || v.polledItemIds.length > 0;
-  if (id === 'confirm') return v.items.length > 0;
+  if (id === 'live') return v.receipt.status === 'polling' || v.receipt.status === 'posting' || v.polledItemIds.length > 0;
+  if (id === 'confirm') return v.items.length > 0 && v.receipt.status !== 'posting';
   if (id === 'export') return v.receipt.status === 'confirmed';
   return false;
 }
@@ -256,6 +266,8 @@ function screenOnboarding() {
 function receiptCard(r, settled) {
   const status = r.status === 'confirmed'
     ? { label: 'LOCKED', bg: 'var(--sage-soft)', color: '#2F6246', hint: 'Ready to copy into Tricount' }
+    : r.status === 'posting'
+      ? { label: 'SENDING POLL…', bg: 'var(--amber-soft)', color: 'var(--amber-text)', hint: 'Posting to the group, one moment' }
     : r.status === 'polling'
       ? { label: 'POLL OPEN', bg: 'var(--amber-soft)', color: 'var(--amber-text)', hint: r.votedCount + ' of ' + (S.data.members.length - 1) + ' housemates have voted' }
       : { label: 'NEEDS REVIEW', bg: 'var(--accent-soft)', color: 'var(--accent-deep)', hint: 'Check the AI read it right' };
@@ -425,7 +437,7 @@ function screenReview() {
       </div>` : ''}
       ${mismatch ? `<div class="banner" style="margin-top:8px">
         <span style="font:700 13px var(--mono);color:var(--amber-text)">!</span>
-        <span style="flex:1">These lines come to ${fmt(v.split.totalCents)}, but the receipt says ${fmt(v.reconcile.printedCents)}.</span>
+        <span style="flex:1">These lines come to ${mono(v.split.totalCents)}, but the receipt says ${mono(v.reconcile.printedCents)}.</span>
       </div>` : ''}
     </div>
 
@@ -466,7 +478,7 @@ function screenReview() {
             <button data-act="tax-mode" data-id="even" style="flex:1;border-radius:8px;font:500 12.5px var(--ui);${v.receipt.tax_mode === 'even' ? 'background:var(--card)' : 'color:var(--ink-60)'}">${v.members.length} ways</button>
           </div>
           <div style="font:400 12px var(--ui);color:var(--ink-60)">${v.receipt.tax_mode === 'even'
-            ? fmt(Math.round(v.receipt.tax_cents / v.members.length)) + ' of tax each, flat.'
+            ? mono(Math.round(v.receipt.tax_cents / v.members.length)) + ' of tax each, flat.'
             : 'Tax follows what each person actually owes.'}</div>
         </div>` : ''}
         <div class="divider"></div>
@@ -542,28 +554,42 @@ function screenManual() {
 
 function screenPoll() {
   const v = S.view;
-  const MAX = 10;
-  const atCap = S.selected.length >= MAX;
+  const sizes = pollSizes(S.selected.length);
+  const picked = v.items.filter((i) => S.selected.includes(i.id));
+  const bubble = (n) => {
+    const from = sizes.slice(0, n).reduce((a, b) => a + b, 0);
+    const part = picked.slice(from, from + sizes[n]);
+    const title = sizes.length > 1 ? ' — ' + (n + 1) + ' of ' + sizes.length : '';
+    const row = (txt, tick) => `<div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:10px;background:var(--fill-hover)">
+            <span style="width:16px;height:16px;border-radius:999px;border:1.5px solid var(--dash);flex:none"></span>
+            <span style="flex:1;font:400 13px var(--ui);overflow:hidden;text-overflow:ellipsis;white-space:nowrap${tick ? ';color:var(--ink-60)' : ''}">${txt}</span>
+          </div>`;
+    return `<div class="card" style="border-radius:16px 16px 16px 6px;padding:15px;display:flex;flex-direction:column;gap:10px">
+        <div style="font:500 14px/1.45 var(--ui)">🛒 ${esc(v.receipt.store)} · ${mono(v.split.totalCents)}${title}<br>Tick anything you're NOT in on. Closes in ${S.data.household.poll_window_hours}h.</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${part.map((i) => row(esc(i.name) + ' — ' + mono(i.price_cents))).join('')}
+          ${row('✅ I\u2019m in on all of these', true)}
+        </div>
+        <div style="font:400 11px var(--mono);color:var(--ink-40)">MULTI-SELECT · ANONYMOUS: OFF</div>
+      </div>`;
+  };
   return `<div class="screen">
     <div class="sticky-head" style="display:flex;flex-direction:column;gap:11px">
       <div style="display:flex;align-items:center;gap:12px">
         <button class="back" data-act="go" data-id="home">&larr;</button>
         <div style="flex:1;display:flex;flex-direction:column;gap:1px">
           <div class="title">Anything worth a poll?</div>
-          <div class="meta" style="letter-spacing:normal">OPTIONAL · ${S.selected.length} PICKED${atCap ? ' · MAX' : ''}</div>
+          <div class="meta" style="letter-spacing:normal">OPTIONAL · ${S.selected.length} PICKED</div>
         </div>
-        <button class="pill" data-act="select-all" style="font:500 10px var(--mono);letter-spacing:.06em;padding:8px 11px">${S.selected.length ? 'CLEAR ALL' : 'SELECT ' + Math.min(MAX, v.items.length)}</button>
+        <button class="pill" data-act="select-all" style="font:500 10px var(--mono);letter-spacing:.06em;padding:8px 11px">${S.selected.length ? 'CLEAR ALL' : 'SELECT ALL ' + v.items.length}</button>
       </div>
       ${flowStrip()}
     </div>
 
     <div style="padding:14px var(--gutter) 0;font:400 13px/1.5 var(--ui);color:var(--ink-60);text-wrap:pretty">
-      Default is simple: everyone pays for everything. Only pick the items where someone might reasonably want out — those go into one Telegram poll.
+      Default is simple: everyone pays for everything. Only pick the items where someone might reasonably want out — those go into a Telegram poll.
     </div>
-    ${atCap ? `<div style="padding:10px var(--gutter) 0"><div class="banner">
-      <span style="font:700 13px var(--mono);color:var(--amber-text)">!</span>
-      <span style="flex:1">A Telegram poll holds ${MAX} options. That's the lot.</span>
-    </div></div>` : ''}
+    ${sizes.length > 1 ? `<div style="padding:10px var(--gutter) 0;font:500 12.5px/1.45 var(--ui);color:var(--amber-text-deep)">That's ${sizes.length} polls of up to 9 items. Fewer picks is kinder to the group.</div>` : ''}
 
     <div style="padding:14px var(--gutter) 0;display:flex;flex-direction:column;gap:8px">
       ${v.items.map((it) => {
@@ -578,22 +604,14 @@ function screenPoll() {
 
     ${S.selected.length ? `<div style="padding:22px var(--gutter) 0;display:flex;flex-direction:column;gap:9px">
       <div class="meta">TELEGRAM PREVIEW</div>
-      <div class="card" style="border-radius:16px 16px 16px 6px;padding:15px;display:flex;flex-direction:column;gap:10px">
-        <div style="font:500 14px/1.45 var(--ui)">🛒 ${esc(v.receipt.store)} · ${fmt(v.split.totalCents)}<br>Tick anything you're NOT in on. Closes in ${S.data.household.poll_window_hours}h.</div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          ${v.items.filter((i) => S.selected.includes(i.id)).map((i) => `<div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:10px;background:var(--fill-hover)">
-            <span style="width:16px;height:16px;border-radius:999px;border:1.5px solid var(--dash);flex:none"></span>
-            <span style="flex:1;font:400 13px var(--ui);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.name)} — ${fmt(i.price_cents)}</span>
-          </div>`).join('')}
-        </div>
-        <div style="font:400 11px var(--mono);color:var(--ink-40)">MULTI-SELECT · ANONYMOUS: OFF</div>
-      </div>
+      ${bubble(0)}
+      ${sizes.length > 1 ? `<div style="font:400 11.5px var(--mono);color:var(--ink-60);padding:0 4px">+ ${sizes.length - 1} more poll${sizes.length > 2 ? 's' : ''} (${S.selected.length - sizes[0]} items)</div>` : ''}
     </div>` : ''}
 
     <div class="grow"></div>
     <div class="sticky-foot">
-      <button class="btn btn-primary" data-act="send-poll" ${S.selected.length ? '' : 'disabled'}>
-        ${S.selected.length ? 'Post poll to the group' : 'Pick at least one item'}
+      <button class="btn btn-primary" data-act="send-poll" ${S.selected.length && sizes.length <= 15 ? '' : 'disabled'}>
+        ${sizes.length > 15 ? 'Too many for 15 polls — pick fewer' : S.selected.length ? 'Post ' + (sizes.length > 1 ? sizes.length + ' polls' : 'poll') + ' to the group' : 'Pick at least one item'}
       </button>
       <button class="btn btn-quiet" data-act="go" data-id="confirm">Skip — split ${v.members.length} ways</button>
     </div>
@@ -612,32 +630,13 @@ function screenLive() {
     ' · CLOSES IN ' + Math.floor(closesIn / 3600) + 'H ' + Math.floor((closesIn % 3600) / 60) + 'M';
 
   const rid = v.receipt.id;
-  return `<div class="screen">
-    <div class="sticky-head" style="display:flex;flex-direction:column;gap:11px">
-      ${flowStrip()}
-      <div style="display:flex;align-items:center;gap:12px">
-        <button class="back" data-act="go" data-id="home">&larr;</button>
-        <div style="flex:1;display:flex;flex-direction:column;gap:1px">
-          <div class="title">Poll is live</div>
-          <div class="meta" style="letter-spacing:normal">${votedCount} OF ${voters.length} VOTED${closesLabel}</div>
-        </div>
-      </div>
-    </div>
-
-    <div style="padding:16px var(--gutter) 0;display:flex;flex-direction:column;gap:11px">
-      <div style="display:flex;gap:8px">
-        ${voters.map((m) => {
-          const voted = v.voterIds.includes(m.id);
-          const outs = v.optOuts.filter((o) => o.memberId === m.id).length;
-          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 4px;border-radius:12px;background:${voted ? 'var(--card)' : '#F1EDE5'};border:1px solid ${voted ? 'var(--line)' : '#E7E2D9'};${voted && fresh(rid + 'v' + m.id) ? 'animation:gsIn .3s ease both' : ''}">
-            <div class="avatar" style="width:30px;height:30px;background:${voted ? esc(m.avatar_color) : 'var(--dash)'};font-size:12px">${esc(m.initial)}</div>
-            <div style="font:500 10px var(--mono);color:${voted ? 'var(--ink-60)' : 'var(--ink-25)'}">${voted ? (outs ? outs + ' OUT' : 'ALL IN') : '…'}</div>
-          </div>`;
-        }).join('')}
-      </div>
-
-      <div class="meta" style="margin-top:6px">OPT-OUTS COMING IN</div>
-      ${v.items.filter((i) => v.polledItemIds.includes(i.id)).map((it) => {
+  const sending = v.receipt.status === 'posting';
+  const many = (v.pollCount || 1) > 1 && Array.isArray(v.polls) && v.polls.length > 1;
+  const polled = v.items.filter((i) => v.polledItemIds.includes(i.id));
+  const groups = many
+    ? v.polls.map((p) => ({ part: p.part, items: polled.filter((i) => p.itemIds.includes(i.id)) }))
+    : [{ part: 1, items: polled }];
+  const card = (it) => {
         const outs = v.optOuts.filter((o) => o.itemId === it.id).map((o) => memberById(o.memberId)).filter(Boolean);
         const inCount = v.members.length - outs.length;
         return `<div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
@@ -651,7 +650,35 @@ function screenLive() {
             <div style="font:500 12px var(--mono);color:var(--ink-60)" data-count="ea-${it.id}" data-cents="${Math.round(it.price_cents / Math.max(1, inCount))}">${fmt(Math.round(it.price_cents / Math.max(1, inCount)))} EA</div>
           </div>
         </div>`;
-      }).join('')}
+  };
+  return `<div class="screen">
+    <div class="sticky-head" style="display:flex;flex-direction:column;gap:11px">
+      ${flowStrip()}
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="back" data-act="go" data-id="home">&larr;</button>
+        <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+          <div class="title">Poll is live</div>
+          <div class="meta" style="letter-spacing:normal">${votedCount} OF ${voters.length} VOTED${sending ? ' · SENDING POLL…' : closesLabel}</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:16px var(--gutter) 0;display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;gap:8px">
+        ${voters.map((m) => {
+          const voted = v.voterIds.includes(m.id);
+          const done = (v.voteProgress && v.voteProgress[m.id]) || 0;
+          const partial = !voted && done > 0;
+          const outs = v.optOuts.filter((o) => o.memberId === m.id).length;
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 4px;border-radius:12px;background:${voted ? 'var(--card)' : '#F1EDE5'};border:1px solid ${voted ? 'var(--line)' : '#E7E2D9'};${voted && fresh(rid + 'v' + m.id) ? 'animation:gsIn .3s ease both' : ''}">
+            <div class="avatar" style="width:30px;height:30px;background:${voted || partial ? esc(m.avatar_color) : 'var(--dash)'};font-size:12px">${esc(m.initial)}</div>
+            <div style="font:500 10px var(--mono);color:${voted || partial ? 'var(--ink-60)' : 'var(--ink-25)'}">${voted ? (outs ? outs + ' OUT' : 'ALL IN') : partial ? done + '/' + v.pollCount : '…'}</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div class="meta" style="margin-top:6px">OPT-OUTS COMING IN</div>
+      ${groups.map((g) => (many ? `<div class="meta" style="margin-top:4px">POLL ${g.part} OF ${v.pollCount}</div>` : '') + g.items.map(card).join('')).join('')}
     </div>
 
     <div class="grow"></div>
@@ -659,7 +686,7 @@ function screenLive() {
       <div style="font:400 12px var(--ui);color:var(--ink-60);text-align:center">${allIn
         ? 'Everyone voted — opening the split…'
         : 'Waiting on ' + (voters.length - votedCount) + ' of ' + voters.length + '. Anyone who never votes stays in.'}</div>
-      <button class="btn ${allIn ? 'btn-primary' : 'btn-ink'}" data-act="close-poll">${allIn ? 'See the split' : 'Close poll early · ' + votedCount + '/' + voters.length + ' in'}</button>
+      <button class="btn ${allIn ? 'btn-primary' : 'btn-ink'}" data-act="close-poll" ${sending ? 'disabled' : ''}>${allIn ? 'See the split' : 'Close poll early · ' + votedCount + '/' + voters.length + ' in'}</button>
     </div>
   </div>`;
 }
@@ -689,7 +716,7 @@ function screenConfirm() {
       <div style="background:var(--ink);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:6px">
         <div style="font:500 11px var(--mono);letter-spacing:.06em;color:var(--ink-40)">${isMe ? 'YOU PAID' : esc(upper(grocer.name)) + ' PAID'}</div>
         <div class="money-hero" style="color:var(--card)" data-count="hero" data-cents="${v.split.totalCents}">${fmt(v.split.totalCents)}</div>
-        <div style="font:400 13px var(--ui);color:#B7B0A5">Owed back by ${v.members.length - 1} housemates: ${fmt(owed)}</div>
+        <div style="font:400 13px var(--ui);color:#B7B0A5">Owed back by ${v.members.length - 1} housemates: ${mono(owed)}</div>
         <div style="margin-top:8px;padding-top:10px;border-top:1px solid rgba(255,253,248,.14);display:flex;justify-content:space-between;font:500 11px var(--mono);letter-spacing:.04em;color:var(--ink-40)">
           <span>SUBTOTAL ${fmt(v.split.subtotalCents)}</span>
           <span>${v.receipt.tax_enabled ? 'TAX ' + fmt(v.split.taxCents) + (v.receipt.tax_mode === 'even' ? ' · EVEN' : ' · BY SHARE') : 'TAX NOT SPLIT'}</span>
@@ -725,8 +752,8 @@ function screenConfirm() {
       <div style="font:400 12px/1.45 var(--ui);color:var(--ink-60);text-align:center;text-wrap:pretty">${isMe
         ? 'Only you can lock this — you did the shopping.'
         : 'Only ' + esc(grocer.name) + ' can lock this — they did the shopping.'}</div>
-      <button class="btn ${isMe ? 'btn-sage' : 'btn-muted'}" data-act="lock">
-        <span style="font:700 15px var(--ui)">${isMe ? '✓' : '⏳'}</span>${isMe ? 'Confirm & lock split' : 'Waiting on ' + esc(grocer.name) + ' to confirm'}
+      <button class="btn ${isMe ? 'btn-sage' : 'btn-muted'}" data-act="lock" ${v.receipt.status === 'posting' ? 'disabled' : ''}>
+        <span style="font:700 15px var(--ui)">${isMe ? '✓' : '⏳'}</span>${v.receipt.status === 'posting' ? 'Polls are still being sent' : isMe ? 'Confirm & lock split' : 'Waiting on ' + esc(grocer.name) + ' to confirm'}
       </button>
     </div>
   </div>`;
@@ -978,7 +1005,7 @@ function editSheet() {
       ${S.confirmDelete ? `<div style="margin-top:15px;padding:15px;border-radius:14px;background:var(--accent-soft);border:1px solid var(--danger-border);display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;flex-direction:column;gap:3px">
           <div style="font:600 15px var(--ui);color:var(--accent-deep)">Remove ${esc(it.name)}?</div>
-          <div style="font:400 12.5px/1.45 var(--ui);color:#A0543A;text-wrap:pretty">It comes off the receipt and everyone's share drops by ${fmt(each)}.</div>
+          <div style="font:400 12.5px/1.45 var(--ui);color:#A0543A;text-wrap:pretty">It comes off the receipt and everyone's share drops by ${mono(each)}.</div>
         </div>
         <div style="display:flex;gap:10px">
           <button data-act="cancel-delete" style="flex:1;height:46px;border-radius:12px;background:var(--card);border:1px solid var(--danger-border);font:600 15px var(--ui);color:var(--ink-60)">Keep it</button>
@@ -1089,7 +1116,7 @@ document.addEventListener('click', (e) => {
     open: () => act(async () => {
       await loadReceipt(id);
       const r = S.view.receipt;
-      go(r.status === 'confirmed' ? 'export' : r.status === 'polling' ? 'live' : 'review');
+      go(r.status === 'confirmed' ? 'export' : r.status === 'polling' || r.status === 'posting' ? 'live' : 'review');
     }),
 
     'new-sheet': () => { S.newSheet = true; S.grocerDraft = meId(); render(); },
@@ -1184,16 +1211,27 @@ document.addEventListener('click', (e) => {
 
     pick: () => {
       const has = S.selected.includes(id);
-      if (!has && S.selected.length >= 10) return toast('A Telegram poll holds 10 options');
       S.selected = has ? S.selected.filter((x) => x !== id) : S.selected.concat([id]);
       render();
     },
     'select-all': () => {
-      S.selected = S.selected.length ? [] : S.view.items.slice(0, 10).map((i) => i.id);
+      S.selected = S.selected.length ? [] : S.view.items.map((i) => i.id);
       render();
     },
     'send-poll': () => act(async () => {
-      S.view = await api('POST', '/api/receipt/' + S.view.receipt.id + '/poll', { itemIds: S.selected });
+      const rid = S.view.receipt.id;
+      try {
+        S.view = await api('POST', '/api/receipt/' + rid + '/poll', { itemIds: S.selected });
+      } catch (e) {
+        // 409: someone else is posting; it may be live a moment later. 400 (cap): stay put.
+        if (e.status === 409) {
+          const keep = S.selected.slice(); // loadReceipt resets picks to the server's; back in review, restore ours
+          await loadReceipt(rid);
+          if (S.view.receipt.status === 'review') S.selected = keep.filter((x) => S.view.items.some((i) => i.id === x));
+          await refreshState(); go(S.view.receipt.status === 'review' ? 'poll' : 'live');
+        }
+        throw e;
+      }
       await refreshState();
       go('live');
       toast('Poll posted');

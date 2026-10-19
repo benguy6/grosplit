@@ -55,13 +55,16 @@ test('rejects missing hash, empty input, and absent user', () => {
   assert.throws(() => verifyInitData(noUser, TOKEN), /no user/);
 });
 
-test('ignores the newer `signature` field rather than failing on it', () => {
-  // Newer clients append `signature`, which is excluded from the hash payload.
-  const base = validFields();
-  const signed = signInitData(base);
+test('accepts newer clients that send `signature`, which IS part of the HMAC payload', () => {
+  // Telegram (Bot API 8.0+) signs `signature` into the hash like any other field;
+  // only `hash` is excluded. Dropping it rejected every real phone.
+  const signed = signInitData(validFields({ signature: 'ed25519_sig_from_telegram' }));
+  assert.equal(verifyInitData(signed, TOKEN).id, 99001);
+
+  // …so it can't be swapped after signing either.
   const p = new URLSearchParams(signed);
-  p.set('signature', 'abc123_not_part_of_the_hash');
-  assert.equal(verifyInitData(p.toString(), TOKEN).id, 99001);
+  p.set('signature', 'swapped');
+  assert.throws(() => verifyInitData(p.toString(), TOKEN), /invalid/);
 });
 
 test('webhook secret comparison rejects wrong and accepts right', () => {

@@ -66,7 +66,8 @@ The household's group is learned automatically when the bot is added to it.
 fly auth login
 fly launch --no-deploy --ha=false       # app name is in fly.toml
 fly volumes create grosplit_data --size 1
-# Secrets come from the gitignored .env.production (real bot token + OPENAI_API_KEY=...),
+# Secrets come from the gitignored .env.production (real bot token, OPENAI_API_KEY, and
+# TELEGRAM_OWNER_ID = your Telegram user id: only that person can link the first group),
 # piped in so they never land in shell history:
 grep '^[A-Z_]*=' .env.production | fly secrets import
 #   PowerShell: Select-String '^[A-Z_]+=' .env.production | % Line | fly secrets import

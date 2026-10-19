@@ -73,6 +73,7 @@ async function parseReceipt(imageBuffer, mimeType = 'image/jpeg', { apiKey = pro
   const dataUri = `data:${mimeType};base64,${imageBuffer.toString('base64')}`;
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    signal: AbortSignal.timeout(60000),
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({

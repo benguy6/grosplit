@@ -55,7 +55,7 @@ catches votes. Nobody types commands at it.
   Adding an npm package needs the owner's OK.
 - **All money is integer cents.** Never floats for stored or transmitted amounts.
 - **Node ≥ 22.13** (`node:sqlite` unflagged). Production image uses Node 24.
-- Hosted on **Fly.io**, region `sin`, **exactly one machine** (SQLite lives on its volume),
+- Hosted on **Fly.io**, region `iad` (US East, near the house), **exactly one machine** (SQLite lives on its volume),
   scale-to-zero. Nothing may depend on a timer running in the background.
 
 ## 4. Data model
@@ -133,9 +133,15 @@ Invariants, always tested:
 ## 8. Telegram poll rules
 
 - Multi-answer, **non-anonymous** (anonymous polls never send `poll_answer`).
-- Options = the picked items (max **9**) + a final **"✅ I'm in on everything"** option. That
-  option keeps the poll at ≥ 2 options (Telegram's minimum) and lets people who want everything
-  actually vote. Ticking it alongside items = the items win (they're out of those).
+- **Any number of items can be polled.** They're split into as many Telegram polls as needed,
+  up to 9 items each (balanced, e.g. 14 → 7 + 7), titled "<store> · 1 of 3". Each poll ends with
+  a **"✅ I'm in on all of these"** option, which keeps every poll at ≥ 2 options (Telegram's
+  minimum) and lets people who want everything actually vote. Ticking it alongside items = the
+  items win (they're out of those).
+- All of a receipt's polls share one deadline and close together. A vote or retraction in one
+  poll only touches that poll's items. A person counts as **voted** once they've answered every
+  poll of the receipt; the Votes screen shows partial progress ("2/3").
+- If sending any poll fails, the ones already sent are stopped and nothing is saved.
 - Option text ≤ 100 chars, question ≤ 300.
 - Deadline = `poll_window_hours` (1–48, default 4). There's no background timer (scale-to-zero),
   so the deadline is enforced by (a) rejecting votes that arrive after it and (b) stopping the
@@ -198,8 +204,9 @@ original review.
 - [x] **B5** Anyone can PATCH themselves to grocer, then lock. → Only the current grocer changes grocer, validated in-household.
 
 ### P1
-- [ ] **B6** A 1-item poll fails (Telegram needs ≥ 2 options). → "I'm in on everything" option.
-- [ ] **B7** People in on everything can't vote. → Same option.
+- [x] **B6** A 1-item poll fails (Telegram needs ≥ 2 options). → "I'm in on all of these" option (part of multi-poll, §8).
+- [x] **B7** People in on everything can't vote. → Same option.
+- [x] **F1** Multiple polls per receipt (§8). Owner request, 2026-10-19. Live on the main bot 2026-10-19.
 - [x] **B8** Votes accepted after the deadline and after lock. → Check status + `poll_closes_at` in `applyPollAnswer`.
 - [x] **B9** Export CSV link gets a 401 in Telegram (no `initData` header). → Remove CSV export (button + endpoint); copying is enough.
 - [x] **B10** Webhook secret is regenerated every boot. → Derive from the bot token when unset.
@@ -236,6 +243,41 @@ original review.
 - [ ] **B39** (P2) B32 still slips when SQLite reuses a freed item id (delete the highest line, add another): the id set looks unchanged, so a stale screen can overwrite the new line. → `receipt.items_version` bumped on every item write, sent back by the client; mismatch = 409 stale.
 - [ ] **B40** (P3) Every toast shows a ✓, including errors ("✓ Someone else just changed this receipt"). → `toast(msg, kind)`, no check for errors.
 
+### Found in live testing on the phone
+- [x] **B41** (P0) Every current Telegram client was rejected at sign-in: `verifyInitData` dropped the `signature` field from the HMAC payload, but only `hash` is excluded (core.telegram.org/bots/webapps). Fixed in telegram.js; the test that encoded the wrong assumption is corrected. Needs the next adversarial pass.
+
+### Found by the F1 adversarial test (verdict PASS) — fixes in progress
+- [x] **B42** (P2) Two simultaneous "Post polls" on one receipt orphan a set of open Telegram polls; a failure after sending also leaves polls open. → Claim the receipt ('posting') before sending; stop everything sent on any failure.
+- [x] **B43** (P3) A retraction (empty answer) still counts as "voted" for that poll. → Delete the voter row.
+- [x] **B44** (P3) No cap on poll count; Telegram rate-limits groups (~20 msgs/min). → Max 15 polls (135 items).
+- [x] **B45** (P2) `npm run dev` without DATABASE_PATH would open the live house DB. → Refuse to start off Fly without DATABASE_PATH.
+- [x] **B46** (P2/P3) host.ps1 hardening: refuse unexpected keys in .env.production, only kill its own processes, health-check before reporting "up", exact tunnel-URL match. Rate-limit the rejected-sign-in log.
+- [ ] **B47** (P2) The group's "Split groceries now" button uses BotFather's Mini App URL, which goes stale on every laptop restart (new tunnel URL). → Owner updates BotFather after a restart until there's a stable host (Fly or a named tunnel).
+
+### Found by the B42–B46 adversarial test (verdict FAIL) — fixes in progress
+- [x] **B48** (P0) Locking while polls are still being sent gets undone: the send's commit overwrites 'confirmed' with 'polling'. Also affects the live version (window = the send, a few seconds). → 409 on lock/close during posting; guarded commit.
+- [x] **B49** (P1) A vote on poll 1 while later polls are still sending is silently dropped. Also affects the live version. → Persist each poll as it's sent; accept votes while posting.
+- [x] **B50** (P2) No timeout on Telegram calls, so a hung send can outlast the 120s sweep → double send, orphaned polls. → 15s timeout, 300s sweep cutoff, sweep/boot stop persisted polls.
+- [x] **B51** (P2/P3) host.ps1: a malformed .env.production line is echoed (could print a pasted token); FLY_APP_NAME not cleared; health check fooled if another process owns :3100.
+
+### Found by the B48–B51 adversarial test (verdict PASS)
+- [ ] **B52** (P2) A poll send that takes >300s wall-clock (laptop sleeps mid-send) can be reverted while still running, then finish under another claim → Telegram polls out of step with the app (money still sums). → Unique claim token checked by every per-poll insert, the commit and the failure handler.
+
+### Found by the pre-Fly adversarial test (verdict FAIL) — fixes in progress
+- [x] **B53** (P1) A basic group upgraded to a supergroup gets a new chat id; the bot kept the dead id → polls fail, nobody can join, /start says "another group". → Follow migrate_to/from_chat_id.
+- [x] **B54** (P2) A fresh database can be claimed by whichever group adds the bot first. → TELEGRAM_OWNER_ID: only the owner can set up or link the house.
+- [x] **B55** (P3) Stranger groups re-adding the bot get the full greeting; raw group titles in logs; /start-linking mentions a button that isn't there.
+
+### Found by the pre-push visual test (verdict FAIL) — fixes in progress
+- [x] **B56** (P1, usability) Footers and the tab bar never stay pinned: `#app { overflow-x: hidden }` turns #app into a scroll container, which disables `position: sticky`. The lock button, poll footer and + FAB sit at the bottom of long pages. → `overflow-x: clip`.
+- [x] **B57** (off-spec) Split hero "Owed back by 5 housemates: $115.00" sets money in Space Grotesk; all money must be JetBrains Mono.
+- [ ] **D1** (owner decision) Handoff vs SPEC §9 conflicts: faint-grey amounts (settled receipt, grocer's own share, sub-lines), several accent elements on Review/Export/Onboarding, long item names truncated at 360px.
+
+### Found by the pre-Fly re-gates (both PASS)
+- [ ] **B58** (polish) Receipts: the tab bar covers the bottom of the last card at rest. → Bottom padding on the list.
+- [ ] **B59** (P3) TELEGRAM_OWNER_ID with stray spaces never matches (fails closed). → trim().
+- [ ] **B60** (P3) After a group→supergroup migration, closing a pre-migration poll may leave it open in Telegram (money unaffected).
+
 ### P3: housekeeping
 - [x] **B20** No commits yet. → First commit pushed to github.com/benguy6/grosplit (private).
 - [x] **B21** `.env.example` emptied in the working tree (staged copy is fine).
@@ -260,6 +302,10 @@ Q5 (no CSV). See the decision log.
 | 2026-10-04 | Owner: visual tester runs once before each push, not after every change. The frontend bot screenshots its own work. |
 | 2026-10-04 | Locked splits are frozen at lock time (§7). |
 | 2026-10-04 | Poll gets an "I'm in on everything" option; item cap 9 (§8). |
+| 2026-10-19 | Owner: polls are no longer capped. Long lists become several linked polls of ≤ 9 items (§8). |
+| 2026-10-19 | Only the owner (TELEGRAM_OWNER_ID, kept in .env.production / Fly secret) can set up or re-link the house. Fly starts with a fresh database (the laptop one has no house yet). |
+| 2026-10-19 | Owner: the real house is the Telegram group "Watertown Family". The old test house is archived in backups/ (fresh grosplit.db). |
+| 2026-10-19 | Owner: the house is in the USA (matters for product-code lookups). Duplicate lines stay as separate lines; no merging for now. |
 | 2026-10-04 | DEV mode must be explicit (`DEV=1`) (§6). |
 | 2026-10-04 | Owner: the house = the Telegram group. Leaving the group = leaving the house (§6). |
 | 2026-10-04 | Owner: anyone in the house may edit receipt lines, for now. |
@@ -269,4 +315,5 @@ Q5 (no CSV). See the decision log.
 | 2026-10-04 | Owner: two bots. Laptop = test bot (@gro_split_test_bot, token in `.env`, `./test.db`). Production = real bot (@gro_split_bot, token kept in gitignored `.env.production`, set as a Fly secret). |
 | 2026-10-04 | Owner: OK that a receipt's creator can make themselves the payer and lock (anyone can already create a receipt naming themselves as payer). |
 | 2026-10-04 | Owner: code lives at https://github.com/benguy6/grosplit — push there after the gates pass. |
+| 2026-10-13 | Owner: no card for Fly yet. Until a real host is sorted, the house runs on the owner's laptop: real bot + ./grosplit.db on port 3100 via scripts/host.ps1 and a Cloudflare quick tunnel (test bot stays on 3000). Laptop must be on and awake. |
 | 2026-10-04 | Owner: remove the "Auto-flag staples" and "Round to nearest cent" switches. Rounding always happens; staples can return if people game the poll. |
