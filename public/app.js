@@ -111,6 +111,13 @@ async function go(screen) {
   if (screen === 'review' && S.view && S.view.lookupsPending > 0) liveTimer = setInterval(refreshReview, 3000);
 }
 
+// Re-GET before saving the item list: labels may have arrived since this screen loaded,
+// and a payload built from the old view would wipe them. Assigns S.view without
+// resetting sheets (loadReceipt would close the one being saved from).
+async function freshen() {
+  S.view = await api('GET', '/api/receipt/' + S.view.receipt.id);
+}
+
 async function refreshState() {
   S.data = await api('GET', '/api/state');
 }
@@ -372,7 +379,7 @@ function screenHome() {
       </div>
     </div>` : ''}
 
-    <div class="grow"></div>
+    <div class="grow" style="min-height:48px"></div>
     ${tabbar('home')}
   </div>`;
 }
@@ -463,7 +470,7 @@ function screenReview() {
           <span class="box ${f ? 'amber' : ''}">${f ? '?' : '✓'}</span>
           <span style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;text-align:left">
             <span style="font:500 15px var(--ui);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.name)}${it.quantity ? ' ×' + it.quantity : ''}</span>
-            <span style="font:400 11px var(--mono);letter-spacing:.03em;color:${f ? 'var(--amber-text)' : 'var(--ink-40)'}">${f ? 'AI UNSURE · TAP TO FIX THE NAME' : (it.item_code ? '#' + esc(it.item_code) + ' · ' : '') + 'SPLIT ' + v.members.length + ' WAYS · ' + fmt(each) + ' EA'}</span>
+            <span style="font:400 11px var(--mono);letter-spacing:.03em;color:${f ? 'var(--amber-text)' : 'var(--ink-40)'}">${(it.item_code ? '#' + esc(it.item_code) + ' · ' : '') + (f ? 'AI UNSURE · TAP TO FIX THE NAME' : 'SPLIT ' + v.members.length + ' WAYS · ' + fmt(each) + ' EA')}</span>
           </span>
           <span class="money">${fmt(it.price_cents)}</span>
           <span class="pill" style="padding:6px 10px;font:500 11px var(--ui);color:var(--ink-60);background:var(--paper)">Edit</span>
@@ -1166,6 +1173,7 @@ document.addEventListener('click', (e) => {
     'save-edit': () => act(async () => {
       const name = (document.getElementById('edit-name').value || '').trim() || 'Untitled item';
       const price = parseFloat(document.getElementById('edit-price').value);
+      await freshen();
       const items = S.view.items.map((i) =>
         i.id === S.editId
           ? { id: i.id, itemCode: i.item_code, name, priceCents: Math.round((isNaN(price) ? 0 : price) * 100), quantity: i.quantity, aiFlagged: false, aiGuess: null }
@@ -1178,6 +1186,7 @@ document.addEventListener('click', (e) => {
     'ask-delete': () => { S.confirmDelete = true; render(); },
     'cancel-delete': () => { S.confirmDelete = false; render(); },
     'delete-item': () => act(async () => {
+      await freshen();
       const items = S.view.items.filter((i) => i.id !== S.editId).map(toPayload);
       S.view = await putItems(items);
       S.editId = null;
@@ -1186,6 +1195,7 @@ document.addEventListener('click', (e) => {
       toast('Item removed');
     }),
     'fix-all': () => act(async () => {
+      await freshen();
       const items = S.view.items.map((i) =>
         i.ai_guess ? { ...toPayload(i), name: i.ai_guess, aiFlagged: false, aiGuess: null } : { ...toPayload(i), aiFlagged: false });
       S.view = await putItems(items);
@@ -1197,6 +1207,7 @@ document.addEventListener('click', (e) => {
       const price = parseFloat(document.getElementById('draft-price').value);
       if (!name) return toast('Give it a name');
       if (isNaN(price)) return toast('Give it a price');
+      await freshen();
       const items = S.view.items.map(toPayload).concat([{ name, priceCents: Math.round(price * 100) }]);
       S.view = await putItems(items);
       await refreshState();

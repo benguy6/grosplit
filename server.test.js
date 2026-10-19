@@ -1187,3 +1187,37 @@ test('F2: the view carries item_code and lookupsPending; PUT keeps the code when
   assert.equal(put.body.items[0].item_code, '1234567', 'older client without itemCode keeps it');
   assert.equal(put.body.lookupsPending, 0);
 });
+
+// ── F2 follow-ups ───────────────────────────────────────────────────────────
+
+test('B63: a hand-made rename drops that item\'s cached label; unchanged or accepted-guess saves keep it', async () => {
+  const { id, items } = await mkReceipt('Costco Wholesale', [{ name: 'KS U/S QTRS', priceCents: 1299, itemCode: '4242' }]);
+  db.prepare('UPDATE item SET ai_guess = ? WHERE id = ?').run('Kirkland unsalted butter', items[0].id);
+  db.prepare('INSERT OR REPLACE INTO product_lookup VALUES (?, ?, ?, ?, ?)').run('costco', '4242', 'Kirkland unsalted butter', 'web', 1);
+  const has = () => !!db.prepare("SELECT 1 FROM product_lookup WHERE store_key = 'costco' AND item_code = '4242'").get();
+  const save = (name) => api('PUT', `/api/receipt/${id}/items`, {
+    items: [{ id: items[0].id, name, priceCents: 1299, aiGuess: 'Kirkland unsalted butter' }], knownIds: [items[0].id],
+  });
+  await save('KS U/S QTRS'); // untouched
+  assert.equal(has(), true);
+  await save('Kirkland unsalted butter'); // they accepted our guess
+  assert.equal(has(), true);
+  await save('Plugra butter'); // their own correction
+  assert.equal(has(), false);
+});
+
+test('B61b: the bot being removed from a group never creates, links or greets', async () => {
+  await withGroupStubs(async ({ house, replies }) => {
+    process.env.TELEGRAM_OWNER_ID = '42';
+    require('./server.js')._setBotForTests('gro_test_bot', 99);
+    db.prepare('UPDATE household SET telegram_chat_id = NULL WHERE id = ?').run(house.id);
+    await handleUpdate({
+      my_chat_member: { chat: grp(-970), from: { id: 42 }, old_chat_member: { status: 'member' }, new_chat_member: { status: 'left' } },
+    });
+    await handleUpdate({
+      my_chat_member: { chat: grp(-970), from: { id: 42 }, old_chat_member: { status: 'member' }, new_chat_member: { status: 'kicked' } },
+    });
+    assert.equal(d.firstHousehold(db).telegram_chat_id, null);
+    assert.equal(replies.length, 0);
+  });
+});

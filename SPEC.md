@@ -275,15 +275,20 @@ original review.
 - [ ] **D1** (owner decision) Handoff vs SPEC §9 conflicts: faint-grey amounts (settled receipt, grocer's own share, sub-lines), several accent elements on Review/Export/Onboarding, long item names truncated at 360px.
 
 ### Found by the pre-Fly re-gates (both PASS)
-- [ ] **B58** (polish) Receipts: the tab bar covers the bottom of the last card at rest. → Bottom padding on the list.
+- [x] **B58** (polish) Receipts: the tab bar covers the bottom of the last card at rest. → Bottom padding on the list.
 - [ ] **B59** (P3) TELEGRAM_OWNER_ID with stray spaces never matches (fails closed). → trim().
 - [ ] **B60** (P3) After a group→supergroup migration, closing a pre-migration poll may leave it open in Telegram (money unaffected).
 
 ### Found by the F2 adversarial test (verdict PASS) — fixes in progress
-- [ ] **B61** (P2, cost) Rescans pay for the same lookups again (no in-flight dedupe; cap is per scan); failed lookups are never cached; no daily cap.
-- [ ] **B62** (P3) Saving from a screen older than freshly-arrived labels wipes them; item numbers hidden on flagged lines (SPEC F2 says always show); cache hits flag lines the OCR was sure about.
-- [ ] **B63** (P3) Labels with markup/URLs/long digit runs are accepted and cached forever; renaming a line doesn't correct the cache; lookups still write to locked receipts.
-- [ ] **B61b** (P3) The house is created on the bot-REMOVED event (my_chat_member member→left), and the greeting is attempted while kicked.
+- [x] **B61** (P2, cost) Rescans pay for the same lookups again (no in-flight dedupe; cap is per scan); failed lookups are never cached; no daily cap.
+- [x] **B62** (P3) Saving from a screen older than freshly-arrived labels wipes them; item numbers hidden on flagged lines (SPEC F2 says always show); cache hits flag lines the OCR was sure about.
+- [x] **B63** (P3) Labels with markup/URLs/long digit runs are accepted and cached forever; renaming a line doesn't correct the cache; lookups still write to locked receipts.
+- [x] **B61b** (P3) The house is created on the bot-REMOVED event (my_chat_member member→left), and the greeting is attempted while kicked.
+
+### Found by the F2 follow-up gate (verdict PASS) — fixes in progress
+- [ ] **B64** (P2, money; root of B39) SQLite reuses the highest item id after a delete, so an edit sheet left open across someone else's delete+add overwrites a DIFFERENT line (price included), and knownIds can't tell. → item.id AUTOINCREMENT (table-rebuild migration) so ids are never reused.
+- [ ] **B65** (P2, cost) The daily lookup cap counts cache rows, not calls: renames and failed retries bypass it. A typo in LOOKUP_DAILY_CAP removes it. → Count calls in their own table; validate the env value.
+- [ ] **B66** (P3) Editing a line someone else deleted says "Item updated"; a second receipt with a code already being looked up never gets the label; per-receipt cap resets on every restart.
 
 ### P3: housekeeping
 - [x] **B20** No commits yet. → First commit pushed to github.com/benguy6/grosplit (private).

@@ -142,8 +142,21 @@ test('a timeout or failure sets nothing, caches nothing, and does not crash', as
   lookup.afterScan(db, id, opts);
   await lookup.whenIdle();
   assert.equal(d.items(db, id)[0].ai_guess, null);
-  assert.equal(db.prepare('SELECT COUNT(*) n FROM product_lookup').get().n, 0);
   assert.equal(lookup.pending(id), 0);
+  // Only a short-lived "failed" marker is cached, so a rescan right away doesn't retry...
+  const row = db.prepare('SELECT label, source FROM product_lookup WHERE item_code = ?').get('777');
+  assert.deepEqual({ ...row }, { label: null, source: 'failed' });
+  const calls = stubFetch(good);
+  lookup.afterScan(db, mk('Costco', [line('KS U/S QTRS', '777')]), opts);
+  await lookup.whenIdle();
+  assert.equal(calls.length, 0, 'no retry within the hour');
+  // ...but after the hour it does.
+  db.prepare("UPDATE product_lookup SET looked_up_at = looked_up_at - 4000 WHERE item_code = '777'").run();
+  const again = mk('Costco', [line('KS U/S QTRS', '777')]);
+  lookup.afterScan(db, again, opts);
+  await lookup.whenIdle();
+  assert.equal(calls.length, 2);
+  assert.equal(d.items(db, again)[0].ai_guess, BUTTER);
 });
 
 test('request shapes: decode = strict schema, no tools; web = web_search + strict schema; both /v1/responses with a timeout', async () => {
@@ -273,4 +286,89 @@ test('migration adds item.item_code and product_lookup to an old database, idemp
     m.close();
   }
   for (const s of ['', '-wal', '-shm']) fs.rmSync(p + s, { force: true, maxRetries: 5, retryDelay: 100 });
+});
+
+// ── cost / safety follow-ups ────────────────────────────────────────────────
+
+test('B61a: a code already being looked up is not paid for again by a rescan or another receipt', async () => {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const calls = stubFetch(async (n, init) => { await gate; return good(n, init); });
+  const a = mk('Costco', [line('KS U/S QTRS', '4040')]);
+  lookup.afterScan(db, a, opts);
+  const b = mk('Costco', [line('KS U/S QTRS', '4040')]);
+  const r2 = lookup.afterScan(db, b, opts); // same store + code, first still running
+  assert.equal(r2.sent, 0);
+  lookup.afterScan(db, a, opts); // rescan of the same receipt
+  release();
+  await lookup.whenIdle();
+  assert.equal(calls.length, 2, 'one lookup = decode + web, once');
+});
+
+test('B61b: pending counts add up across scans instead of being overwritten', async () => {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  stubFetch(async (n, init) => { await gate; return good(n, init); });
+  const id = mk('Costco', [line('A', '5001'), line('B', '5002')]);
+  lookup.afterScan(db, id, opts);
+  assert.equal(lookup.pending(id), 2);
+  d.replaceItems(db, id, [line('A', '5001'), line('B', '5002'), line('C', '5003')]);
+  lookup.afterScan(db, id, opts); // only C is new
+  assert.equal(lookup.pending(id), 3, 'added, not reset to 1');
+  release();
+  await lookup.whenIdle();
+  assert.equal(lookup.pending(id), 0);
+});
+
+test('B61: the 15 cap is per receipt across rescans', async () => {
+  const calls = stubFetch(good);
+  const id = mk('Costco', Array.from({ length: 15 }, (_, i) => line('I' + i, String(6000 + i))));
+  assert.equal(lookup.afterScan(db, id, opts).sent, 15);
+  await lookup.whenIdle();
+  d.replaceItems(db, id, Array.from({ length: 5 }, (_, i) => line('J' + i, String(7000 + i))));
+  assert.equal(lookup.afterScan(db, id, opts).sent, 0, 'already used the receipt\'s 15');
+  assert.equal(calls.length, 30);
+});
+
+test('B61d: a daily cap on paid lookups for the whole deployment', async () => {
+  process.env.LOOKUP_DAILY_CAP = '4'; // = 2 lookups
+  try {
+    const calls = stubFetch(good);
+    const id = mk('Costco', Array.from({ length: 5 }, (_, i) => line('K' + i, String(8000 + i))));
+    assert.equal(lookup.afterScan(db, id, opts).sent, 2);
+    await lookup.whenIdle();
+    assert.equal(calls.length, 4);
+    const id2 = mk('Costco', [line('Z', '8100')]);
+    assert.equal(lookup.afterScan(db, id2, opts).sent, 0, 'over the cap: skipped silently');
+    assert.equal(d.items(db, id2)[0].ai_guess, null);
+  } finally { delete process.env.LOOKUP_DAILY_CAP; }
+});
+
+test('B63: labels with markup, links or long digit runs are rejected', () => {
+  for (const bad of ['<b>Butter</b>', 'Butter {x}', 'Butter see www.x.io', 'Butter http://x.y', 'buy at shop.com', 'Butter 12345678', 'a > b'])
+    assert.equal(lookup.validLabel(bad, 'KS'), null, bad);
+  assert.equal(lookup.validLabel('Kirkland unsalted butter, 4 sticks', 'KS'), 'Kirkland unsalted butter, 4 sticks');
+  assert.equal(lookup.validLabel('Pack of 24 bottles 500ml', 'KS'), 'Pack of 24 bottles 500ml');
+});
+
+test('B63: the background update only touches receipts still in review', async () => {
+  const id = mk('Costco', [line('KS U/S QTRS', '9191')]);
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  stubFetch(async (n, init) => { await gate; return good(n, init); });
+  lookup.afterScan(db, id, opts);
+  db.prepare("UPDATE receipt SET status = 'confirmed' WHERE id = ?").run(id);
+  release();
+  await lookup.whenIdle();
+  assert.equal(d.items(db, id)[0].ai_guess, null);
+});
+
+test('B62: a cache hit does not flag a line the reader was happy with', () => {
+  db.prepare('INSERT INTO product_lookup VALUES (?, ?, ?, ?, ?)').run('costco', '3030', 'Kirkland butter', 'web', 1);
+  const id = mk('Costco', [line('KS BUTTER', '3030', { aiFlagged: false }), line('KS U/S QTRS', '3030')]);
+  lookup.afterScan(db, id, opts);
+  const [plain, flagged] = d.items(db, id);
+  assert.equal(plain.ai_guess, 'Kirkland butter');
+  assert.equal(plain.ai_flagged, 0, 'stays unflagged');
+  assert.equal(flagged.ai_flagged, 1);
 });

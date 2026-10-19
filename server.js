@@ -300,6 +300,17 @@ async function api(req, res, url, me) {
       if (known.size !== current.size || ![...known].every((k) => current.has(k))) {
         return send(res, 409, { error: "Someone else just changed this receipt. Here's the latest.", code: 'stale' });
       }
+      // A hand-made correction beats the shared cache: drop the cached label for a coded line
+      // the user renamed to something other than what we suggested.
+      const before = new Map(d.items(db, id).map((i) => [i.id, i]));
+      const skey = lookup.storeKey(r.store);
+      for (const row of rows) {
+        const old = before.get(Number(row.id));
+        const code = old && old.item_code;
+        if (skey && code && row.name !== old.name && row.name !== old.ai_guess) {
+          db.prepare('DELETE FROM product_lookup WHERE store_key = ? AND item_code = ?').run(skey, code);
+        }
+      }
       d.syncItems(db, id, rows, b.knownIds);
       return ok(res, receiptView(id, me));
     }
@@ -704,6 +715,9 @@ async function handleUpdate(update) {
 
   const chat = (msg && msg.chat) || (update.my_chat_member && update.my_chat_member.chat);
   if (!chat || (chat.type !== 'group' && chat.type !== 'supergroup')) return;
+  // Being removed from a group: nothing to set up, nobody to greet.
+  const mc = update.my_chat_member;
+  if (mc && mc.new_chat_member && ['left', 'kicked'].includes(mc.new_chat_member.status)) return;
 
   const start = isStartCommand(update);
   const added = wasJustAdded(update);

@@ -13,6 +13,9 @@ const MAX_LOOKUPS = 15;        // per receipt
 const CONCURRENCY = 3;
 const TIMEOUT_MS = 20000;
 const UNKNOWN_RETRY_SECONDS = 30 * 24 * 3600;
+const FAILED_RETRY_SECONDS = 3600; // a lookup that errored: don't hammer it on every rescan
+// Calls (decode + web = 2 per lookup) the whole deployment may spend in any rolling 24h.
+const dailyCap = () => Number(process.env.LOOKUP_DAILY_CAP || 100);
 // ponytail: env-configurable because the best cheap web-capable model changes often.
 const model = () => process.env.OPENAI_LOOKUP_MODEL || 'gpt-4o-mini';
 
@@ -66,6 +69,8 @@ function validLabel(label, printed) {
   if (typeof label !== 'string') return null;
   const t = label.replace(/\s+/g, ' ').trim();
   if (!t || t.length > MAX_LABEL || /[.!?:]$/.test(t) || SENTENCE_START.test(t)) return null;
+  // The label ends up in the UI: no markup, no links, no long digit runs (phone/codes).
+  if (/[<>{}]/.test(t) || /:\/\/|www\.|\.(com|net|org|io|co|app)\b/i.test(t) || /\d{7,}/.test(t)) return null;
   const norm = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   if (norm(t) === norm(printed)) return null;
   return t;
@@ -133,7 +138,9 @@ async function fetchLabel({ store, code, printed }, { apiKey = process.env.OPENA
   return { label: null, source: 'unknown' };
 }
 
-const inFlight = new Map(); // receiptId -> count
+const inFlight = new Map(); // receiptId -> lookups still running
+const lookingUp = new Set(); // 'storeKey|code' being looked up right now (a rescan must not pay twice)
+const startedFor = new Map(); // receiptId -> lookups ever started (the 15 cap is per receipt, not per scan)
 const running = new Set();  // promises, so tests (and shutdown) can wait
 const pending = (receiptId) => inFlight.get(receiptId) || 0;
 const whenIdle = async () => { while (running.size) await Promise.allSettled([...running]); };
@@ -154,21 +161,36 @@ function afterScan(db, receiptId, { fetchLabel: fetcher = fetchLabel, apiKey = p
       if (!it.item_code) continue;
       const hit = getCache.get(key, it.item_code);
       if (hit && hit.label) {
-        db.prepare('UPDATE item SET ai_guess = ?, ai_flagged = 1 WHERE id = ?').run(hit.label, it.id);
+        // Only the suggestion; whether the line looks "unsure" stays what the reader decided.
+        db.prepare('UPDATE item SET ai_guess = ? WHERE id = ?').run(hit.label, it.id);
         cached++;
-      } else if (hit && now - hit.looked_up_at < UNKNOWN_RETRY_SECONDS) {
-        // recently answered "unknown": don't pay again
-      } else if (it.ai_flagged) {
+      } else if (hit && now - hit.looked_up_at < (hit.source === 'failed' ? FAILED_RETRY_SECONDS : UNKNOWN_RETRY_SECONDS)) {
+        // recently answered "unknown" (or recently failed): don't pay again
+      } else if (it.ai_flagged && !lookingUp.has(key + '|' + it.item_code)) {
         todo.push(it);
       }
     }
   }
-  const queue = todo.slice(0, MAX_LOOKUPS);
+  // Per receipt (across rescans), then the whole deployment's daily budget.
+  const room = Math.max(0, MAX_LOOKUPS - (startedFor.get(receiptId) || 0));
+  const spent = key
+    ? db.prepare('SELECT COUNT(*) AS n FROM product_lookup WHERE looked_up_at >= ?').get(now - 86400).n * 2 + lookingUp.size * 2
+    : 0;
+  const budget = Math.max(0, Math.floor((dailyCap() - spent) / 2));
+  const queue = [];
+  const seen = new Set();
+  for (const it of todo) { // the same code twice on one receipt is one lookup
+    if (queue.length >= Math.min(room, budget)) break;
+    if (!seen.has(it.item_code)) { seen.add(it.item_code); queue.push(it); }
+  }
   const sent = apiKey ? queue.length : 0;
-  console.log(`lookups: ${sent} sent, ${cached} cached`); // counts only — never item text
+  const skipped = apiKey ? todo.length - sent : 0;
+  console.log(`lookups: ${sent} sent, ${cached} cached, ${skipped} skipped`); // counts only — never item text
   if (!sent) return { sent, cached };
 
-  inFlight.set(receiptId, queue.length);
+  startedFor.set(receiptId, (startedFor.get(receiptId) || 0) + sent);
+  inFlight.set(receiptId, pending(receiptId) + sent); // add: a rescan must not shorten the client's polling
+  for (const it of queue) lookingUp.add(key + '|' + it.item_code);
   const store = r.store;
   const worker = async () => {
     while (queue.length) {
@@ -178,14 +200,23 @@ function afterScan(db, receiptId, { fetchLabel: fetcher = fetchLabel, apiKey = p
         db.prepare(
           'INSERT OR REPLACE INTO product_lookup (store_key, item_code, label, source, looked_up_at) VALUES (?, ?, ?, ?, ?)',
         ).run(key, it.item_code, label, label ? source : 'unknown', Math.floor(Date.now() / 1000));
-        // Only if the line is still there and the user hasn't touched its name or guess meanwhile.
+        // Only if the line is still there, the receipt is still in review, and the user hasn't
+        // touched its name or guess meanwhile.
         if (label) {
-          db.prepare('UPDATE item SET ai_guess = ?, ai_flagged = 1 WHERE id = ? AND receipt_id = ? AND name = ? AND ai_guess IS ?')
-            .run(label, it.id, receiptId, it.name, it.ai_guess);
+          db.prepare(
+            `UPDATE item SET ai_guess = ? WHERE id = ? AND receipt_id = ? AND name = ? AND ai_guess IS ?
+               AND EXISTS (SELECT 1 FROM receipt r WHERE r.id = item.receipt_id AND r.status = 'review')`,
+          ).run(label, it.id, receiptId, it.name, it.ai_guess);
         }
       } catch {
-        /* timeout, network, closed db: set nothing and cache nothing, so it can be retried */
+        // Timeout/network: set no guess, and remember the failure briefly so a rescan doesn't retry at once.
+        try {
+          db.prepare(
+            "INSERT OR REPLACE INTO product_lookup (store_key, item_code, label, source, looked_up_at) VALUES (?, ?, NULL, 'failed', ?)",
+          ).run(key, it.item_code, Math.floor(Date.now() / 1000));
+        } catch { /* closed db */ }
       } finally {
+        lookingUp.delete(key + '|' + it.item_code);
         inFlight.set(receiptId, Math.max(0, pending(receiptId) - 1));
       }
     }
