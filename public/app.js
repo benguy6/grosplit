@@ -857,7 +857,7 @@ function screenHistory() {
   </div>`;
 }
 
-const PALETTE = ['#E8552D', '#3B7A57', '#5C574F', '#D9A400', '#8A6A4B', '#7A8B99', '#B0473F', '#4F6B8A'];
+const PALETTE = ['#E8552D', '#3B7A57', '#5C574F', '#D9A400', '#8A6A4B', '#7A8B99', '#B0473F', '#4F6B8A', '#C2577A']; // last: pink (owner request)
 
 function screenHouse() {
   const h = S.data.household;

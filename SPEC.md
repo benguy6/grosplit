@@ -210,7 +210,7 @@ original review.
 - [x] **B8** Votes accepted after the deadline and after lock. → Check status + `poll_closes_at` in `applyPollAnswer`.
 - [x] **B9** Export CSV link gets a 401 in Telegram (no `initData` header). → Remove CSV export (button + endpoint); copying is enough.
 - [x] **B10** Webhook secret is regenerated every boot. → Derive from the bot token when unset.
-- [ ] **B11** Fly may run 2 machines, which means 2 databases. → README deploys with `--ha=false` and checks `fly machines list` / `fly volumes list`. Tick after the first deploy is verified.
+- [x] **B11** Fly may run 2 machines, which means 2 databases. → README deploys with `--ha=false` and checks `fly machines list` / `fly volumes list`. Tick after the first deploy is verified.
 
 ### P2
 - [x] **B12** "Auto-flag staples" and "Round to nearest cent" toggles do nothing. → Remove both from the UI and the API (DB columns can stay; unused).
@@ -252,7 +252,7 @@ original review.
 - [x] **B44** (P3) No cap on poll count; Telegram rate-limits groups (~20 msgs/min). → Max 15 polls (135 items).
 - [x] **B45** (P2) `npm run dev` without DATABASE_PATH would open the live house DB. → Refuse to start off Fly without DATABASE_PATH.
 - [x] **B46** (P2/P3) host.ps1 hardening: refuse unexpected keys in .env.production, only kill its own processes, health-check before reporting "up", exact tunnel-URL match. Rate-limit the rejected-sign-in log.
-- [ ] **B47** (P2) The group's "Split groceries now" button uses BotFather's Mini App URL, which goes stale on every laptop restart (new tunnel URL). → Owner updates BotFather after a restart until there's a stable host (Fly or a named tunnel).
+- [x] **B47** (P2) The group's "Split groceries now" button uses BotFather's Mini App URL, which goes stale on every laptop restart (new tunnel URL). → Owner updates BotFather after a restart until there's a stable host (Fly or a named tunnel).
 
 ### Found by the B42–B46 adversarial test (verdict FAIL) — fixes in progress
 - [x] **B48** (P0) Locking while polls are still being sent gets undone: the send's commit overwrites 'confirmed' with 'polling'. Also affects the live version (window = the send, a few seconds). → 409 on lock/close during posting; guarded commit.
@@ -303,6 +303,7 @@ Q5 (no CSV). See the decision log.
 | 2026-10-04 | Locked splits are frozen at lock time (§7). |
 | 2026-10-04 | Poll gets an "I'm in on everything" option; item cap 9 (§8). |
 | 2026-10-19 | Owner: polls are no longer capped. Long lists become several linked polls of ≤ 9 items (§8). |
+| 2026-10-19 | Deployed to Fly: https://grosplit-blk42.fly.dev (app grosplit-blk42, region iad, one machine, one 1GB volume). The laptop host is retired; scripts/host.ps1 stays as a fallback. |
 | 2026-10-19 | Only the owner (TELEGRAM_OWNER_ID, kept in .env.production / Fly secret) can set up or re-link the house. Fly starts with a fresh database (the laptop one has no house yet). |
 | 2026-10-19 | Owner: the real house is the Telegram group "Watertown Family". The old test house is archived in backups/ (fresh grosplit.db). |
 | 2026-10-19 | Owner: the house is in the USA (matters for product-code lookups). Duplicate lines stay as separate lines; no merging for now. |

@@ -98,7 +98,7 @@ CREATE INDEX IF NOT EXISTS idx_optout_receipt ON opt_out(receipt_id);
 `;
 
 // Assigned on join, never reshuffled. From the design tokens.
-const PALETTE = ['#E8552D', '#3B7A57', '#5C574F', '#D9A400', '#8A6A4B', '#7A8B99', '#B0473F', '#4F6B8A'];
+const PALETTE = ['#E8552D', '#3B7A57', '#5C574F', '#D9A400', '#8A6A4B', '#7A8B99', '#B0473F', '#4F6B8A', '#C2577A']; // last: pink (owner request)
 
 function open(path) {
   const db = new DatabaseSync(path);
