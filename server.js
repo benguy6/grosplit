@@ -217,6 +217,7 @@ async function api(req, res, url, me) {
         subtotalCents: v.split.subtotalCents,
         evenShareCents: v.evenShareCents,
         votedCount: v.voterIds.length,
+        pollCount: v.pollCount,
       };
     });
     return ok(res, { me, household: house, members: d.members(db, house.id), receipts: list, dev: DEV });
@@ -497,8 +498,21 @@ async function closePoll(receiptId) {
       }
     }
   }
-  db.prepare("UPDATE receipt SET status = 'review', poll_closes_at = NULL WHERE id = ? AND status = 'polling'")
+  const closed = db.prepare("UPDATE receipt SET status = 'review', poll_closes_at = NULL WHERE id = ? AND status = 'polling'")
     .run(receiptId);
+  // Tell the house once per close: only the call that actually flipped the status speaks.
+  if (closed.changes && house.telegram_chat_id) {
+    const voted = new Set();
+    const polls = d.polls(db, receiptId);
+    const answered = new Map();
+    for (const v of d.voters(db, receiptId)) answered.set(v.member_id, (answered.get(v.member_id) || 0) + 1);
+    for (const [m, n] of answered) if (n >= polls.length) voted.add(m);
+    const grocer = d.members(db, r.household_id).find((m) => m.id === r.grocer_id);
+    const everyone = d.members(db, r.household_id).length; // the grocer votes too
+    await say(house.telegram_chat_id,
+      '🗳 Poll closed for ' + r.store + '. ' + voted.size + ' of ' + everyone + ' voted. ' +
+      (grocer ? grocer.name : 'Grocer') + ', the split is ready to lock.');
+  }
 }
 
 // A send that died mid-flight must not leave the receipt stuck, nor its polls open in
@@ -569,7 +583,6 @@ async function applyPollAnswerNow(answer) {
     });
     console.log('enrolled from poll vote:', member.name);
   }
-  if (member.id === r.grocer_id) return; // the grocer never votes
   // The receipt may have been locked or re-polled while we awaited Telegram.
   const now = d.receipt(db, r.id);
   if (!now || !voteOpen(now) ||

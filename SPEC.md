@@ -77,7 +77,8 @@ NOT EXISTS` does not add columns to an existing table).
 ## 5. Money rules (normative)
 
 ```
-per item:  participants = all members − opt-outs   (opt-outs count only on polled items)
+per item:  participants = all members − opt-outs   (opt-outs count only on polled items;
+                                                    the grocer can opt out too)
            each participant += price / participants.length
 tax:       'pro'  → member.amount / subtotal × tax   (falls back to even if subtotal is 0)
            'even' → tax / members
@@ -86,7 +87,7 @@ rounding:  every non-grocer rounds to whole cents; grocer = total − everyone e
 
 Invariants, always tested:
 1. **Shares sum to the total exactly.**
-2. **No item ever has zero participants.** The grocer can't opt out, and non-voters stay in.
+2. **No item ever has zero participants.** Non-voters stay in, and if literally everyone opts out of an item it is split between everyone.
 3. **A locked split never changes.** Not when members join or leave, not when late votes
    arrive, not when anything else is edited.
 
@@ -291,8 +292,19 @@ original review.
 - [x] **B66** (P3) Editing a line someone else deleted says "Item updated"; a second receipt with a code already being looked up never gets the label; per-receipt cap resets on every restart.
 
 ### Found by the B64 gate (verdict PASS)
-- [ ] **B67** (P2) The item rebuild runs foreign_key_check over the WHOLE DB and throws on any orphan, so one orphaned row anywhere = the app never boots (crash loop). Live DB checked clean (0 violations) before deploy. → Check only polled_item/opt_out, or roll back and keep running on the old schema.
-- [ ] **B68** (P3) A line waiting on another receipt's lookup doesn't add to its own receipt's pending count, so that Review screen doesn't poll for the label.
+- [x] **B67** (P2) The item rebuild runs foreign_key_check over the WHOLE DB and throws on any orphan, so one orphaned row anywhere = the app never boots (crash loop). Live DB checked clean (0 violations) before deploy. → Check only polled_item/opt_out, or roll back and keep running on the old schema.
+- [x] **B68** (P3) A line waiting on another receipt's lookup doesn't add to its own receipt's pending count, so that Review screen doesn't poll for the label.
+
+### Owner request 2026-10-19
+- [x] **F3** The payer's poll answers count (they used to be silently ignored). The payer appears in the Votes screen and in "N of M voted"; auto-advance waits for everyone including the payer.
+- [x] **F4** After a poll closes: "POLL CLOSED" card that opens the Split, Review banner + "See the split", a confirm before a new poll wipes votes, and one "Poll closed" message in the group.
+
+### Found by the F3/F4 gate (verdict PASS)
+- [ ] **B69** (P3, money display) Now that the payer can opt out, their share can round to a few cents BELOW zero (worst seen −3¢), shown as "$-0.01". → Largest-remainder rounding on items the payer is out of; fmt shows "-$0.01".
+- [ ] **B70** (P3) Locking while a poll is open sends "…the split is ready to lock" though it was just locked. → Pass the reason into closePoll.
+- [ ] **B71** (P3) The "Replace" confirm checks this phone's view; if someone else posted+closed a poll meanwhile, Post wipes their votes without asking. → freshen() before the check.
+- [ ] **F5** Manual opt-out editing on the Split screen (owner wants Raymond's missed poll-3 opt-outs added; also covers anyone who forgets to vote).
+- [ ] **F6** "Reopen voting" — fresh polls that keep everyone's existing votes (owner deciding: unfinished parts only vs all parts).
 
 ### P3: housekeeping
 - [x] **B20** No commits yet. → First commit pushed to github.com/benguy6/grosplit (private).
@@ -319,6 +331,7 @@ Q5 (no CSV). See the decision log.
 | 2026-10-04 | Locked splits are frozen at lock time (§7). |
 | 2026-10-04 | Poll gets an "I'm in on everything" option; item cap 9 (§8). |
 | 2026-10-19 | Owner: polls are no longer capped. Long lists become several linked polls of ≤ 9 items (§8). |
+| 2026-10-19 | Owner: the payer (grocer) votes like everyone else — their opt-outs count; they still pay the whole bill and are owed back the rest. Gene's ignored votes on the first Costco receipt don't matter (he's in on everything). |
 | 2026-10-19 | Owner: build F2 (item-number lookups into readable labels). Web lookups cost a little per new product; cached forever per store + number. |
 | 2026-10-19 | Owner: build F2 (item-number lookups into readable labels). Web lookups cost a little per new product; cached forever per store + number. |
 | 2026-10-19 | Deployed to Fly: https://grosplit-blk42.fly.dev (app grosplit-blk42, region iad, one machine, one 1GB volume). The laptop host is retired; scripts/host.ps1 stays as a fallback. |

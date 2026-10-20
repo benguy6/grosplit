@@ -159,6 +159,10 @@ const lookingUp = new Map(); // 'storeKey|code' being looked up -> lines waiting
 const startedFor = new Map();
 const running = new Set();  // promises, so tests (and shutdown) can wait
 const pending = (receiptId) => inFlight.get(receiptId) || 0;
+const bump = (receiptId, by) => {
+  const n = Math.max(0, pending(receiptId) + by);
+  if (n) inFlight.set(receiptId, n); else inFlight.delete(receiptId);
+};
 const whenIdle = async () => { while (running.size) await Promise.allSettled([...running]); };
 
 /**
@@ -186,8 +190,12 @@ function afterScan(db, receiptId, { fetchLabel: fetcher = fetchLabel, apiKey = p
         const waiting = lookingUp.get(key + '|' + it.item_code);
         // Already being looked up (a rescan, or another receipt): don't pay again, but give this
         // line the answer too when it arrives.
-        if (waiting) waiting.push({ receiptId, id: it.id, name: it.name, ai_guess: it.ai_guess });
-        else todo.push(it);
+        if (waiting) {
+          waiting.waiters.push({ receiptId, id: it.id, name: it.name, ai_guess: it.ai_guess });
+          // A different receipt's screen should poll until the shared lookup is done. (The
+          // owner receipt is already counted by the lookup itself.)
+          if (receiptId !== waiting.owner) bump(receiptId, 1);
+        } else todo.push(it);
       }
     }
   }
@@ -210,10 +218,10 @@ function afterScan(db, receiptId, { fetchLabel: fetcher = fetchLabel, apiKey = p
 
   startedFor.set(receiptId, (startedFor.get(receiptId) || 0) + sent);
   inFlight.set(receiptId, pending(receiptId) + sent); // add: a rescan must not shorten the client's polling
-  for (const it of queue) lookingUp.set(key + '|' + it.item_code, []);
+  for (const it of queue) lookingUp.set(key + '|' + it.item_code, { owner: receiptId, waiters: [] });
   for (const it of dups) {
     const w = lookingUp.get(key + '|' + it.item_code);
-    if (w) w.push({ receiptId, id: it.id, name: it.name, ai_guess: it.ai_guess });
+    if (w) w.waiters.push({ receiptId, id: it.id, name: it.name, ai_guess: it.ai_guess });
   }
   const store = r.store;
   const worker = async () => {
@@ -233,7 +241,7 @@ function afterScan(db, receiptId, { fetchLabel: fetcher = fetchLabel, apiKey = p
                AND EXISTS (SELECT 1 FROM receipt r WHERE r.id = item.receipt_id AND r.status = 'review')`,
           );
           // This line, plus every other line that was waiting on the same store + code.
-          for (const t of [{ receiptId, id: it.id, name: it.name, ai_guess: it.ai_guess }, ...(lookingUp.get(key + '|' + it.item_code) || [])]) {
+          for (const t of [{ receiptId, id: it.id, name: it.name, ai_guess: it.ai_guess }, ...((lookingUp.get(key + '|' + it.item_code) || {}).waiters || [])]) {
             apply.run(label, t.id, t.receiptId, t.name, t.ai_guess);
           }
         }
@@ -248,8 +256,11 @@ function afterScan(db, receiptId, { fetchLabel: fetcher = fetchLabel, apiKey = p
           } catch { /* closed db */ }
         }
       } finally {
+        const shared = lookingUp.get(key + '|' + it.item_code) || { owner: receiptId, waiters: [] };
         lookingUp.delete(key + '|' + it.item_code);
-        inFlight.set(receiptId, Math.max(0, pending(receiptId) - 1));
+        // success or failure: other receipts are done waiting
+        for (const w of shared.waiters) if (w.receiptId !== shared.owner) bump(w.receiptId, -1);
+        bump(receiptId, -1);
       }
     }
   };

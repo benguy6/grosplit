@@ -26,6 +26,7 @@ const S = {
   newSheet: false,
   payerSheet: false,   // review: change who paid
   confirmDeleteReceipt: false,
+  confirmReplace: false,   // poll composer: replacing a poll that already ran
   grocerDraft: null,
   scanning: false,
   scanError: null,
@@ -95,7 +96,7 @@ function stopLive() { clearInterval(liveTimer); liveTimer = null; }
 // Sheets and armed confirmations belong to one screen of one receipt; never carry them over.
 function resetTransient() {
   S.newSheet = false; S.payerSheet = false; S.editId = null;
-  S.confirmDelete = false; S.confirmDeleteReceipt = false; S.colorFor = null;
+  S.confirmDelete = false; S.confirmDeleteReceipt = false; S.confirmReplace = false; S.colorFor = null;
 }
 
 async function go(screen) {
@@ -118,6 +119,10 @@ async function go(screen) {
 async function freshen() {
   S.view = await api('GET', '/api/receipt/' + S.view.receipt.id);
 }
+
+// A receipt "has had a poll" once a poll row exists. State rows may only carry votedCount
+// (voters only exist after a poll), so fall back to that until they carry pollCount too.
+const hadPoll = (r) => (r.pollCount != null ? r.pollCount > 0 : (r.votedCount || 0) > 0);
 
 async function refreshState() {
   S.data = await api('GET', '/api/state');
@@ -145,8 +150,8 @@ async function refreshView() {
     const before = S.view.voterIds.length;
     S.view = await api('GET', '/api/receipt/' + S.view.receipt.id);
     render();
-    // Everyone has voted — the grocer shouldn't have to babysit it.
-    const total = S.view.members.length - 1;
+    // Everyone (the payer too) has voted — nobody should have to babysit it.
+    const total = S.view.members.length;
     if (S.screen === 'live' && S.view.voterIds.length >= total && before < total) {
       setTimeout(() => { if (S.screen === 'live') { stopLive(); go('confirm'); } }, 1500);
     }
@@ -289,8 +294,10 @@ function receiptCard(r, settled) {
     : r.status === 'posting'
       ? { label: 'SENDING POLL…', bg: 'var(--amber-soft)', color: 'var(--amber-text)', hint: 'Posting to the group, one moment' }
     : r.status === 'polling'
-      ? { label: 'POLL OPEN', bg: 'var(--amber-soft)', color: 'var(--amber-text)', hint: r.votedCount + ' of ' + (S.data.members.length - 1) + ' housemates have voted' }
-      : { label: 'NEEDS REVIEW', bg: 'var(--accent-soft)', color: 'var(--accent-deep)', hint: 'Check the AI read it right' };
+      ? { label: 'POLL OPEN', bg: 'var(--amber-soft)', color: 'var(--amber-text)', hint: r.votedCount + ' of ' + S.data.members.length + ' housemates have voted' }
+      : hadPoll(r)
+        ? { label: 'POLL CLOSED', bg: 'var(--sage-soft)', color: '#2F6246', hint: 'Votes are in — lock the split' }
+        : { label: 'NEEDS REVIEW', bg: 'var(--accent-soft)', color: 'var(--accent-deep)', hint: 'Check the AI read it right' };
   const grocer = memberById(r.grocer_id);
   const when = new Date(r.created_at * 1000);
   const isToday = new Date().toDateString() === when.toDateString();
@@ -438,6 +445,7 @@ function screenReview() {
   const flags = v.items.filter((i) => i.ai_flagged);
   const taxOn = !!v.receipt.tax_enabled;
   const mismatch = v.reconcile && v.reconcile.deltaCents !== 0;
+  const closedPoll = v.receipt.status === 'review' && v.pollCount > 0;
 
   return `<div class="screen">
     <div class="sticky-head">
@@ -450,6 +458,10 @@ function screenReview() {
         </div>
         <div style="font:700 20px var(--mono);font-variant-numeric:tabular-nums" data-count="review-total" data-cents="${v.split.totalCents}">${fmt(v.split.totalCents)}</div>
       </div>
+      ${closedPoll ? `<div class="banner" style="margin-top:11px;background:var(--sage-soft);border-color:var(--sage-muted);color:#2F6246">
+        <span style="flex:1">Poll closed · ${v.voterIds.length} voted · <span style="white-space:nowrap">${v.optOuts.length} opt-out${v.optOuts.length === 1 ? '' : 's'}</span></span>
+        <button data-act="go" data-id="confirm" style="font:600 12px var(--ui);color:#2F6246;text-decoration:underline">See the split &rarr;</button>
+      </div>` : ''}
       ${flags.length ? `<div class="banner" style="margin-top:11px">
         <span style="font:700 13px var(--mono);color:var(--amber-text)">!</span>
         <span style="flex:1">${flags.length === 1 ? "1 name the AI wasn't sure about" : flags.length + " names the AI wasn't sure about"}</span>
@@ -516,10 +528,11 @@ function screenReview() {
       <div style="display:flex;justify-content:space-between;font:500 12.5px var(--ui);color:var(--ink-60)">
         <span>Everyone in on everything</span><span style="font-family:var(--mono)">${fmt(v.evenShareCents)} each</span>
       </div>
-      <button class="btn btn-primary" data-act="go" data-id="poll" ${v.items.length ? '' : 'disabled'}>
+      ${closedPoll ? `<button class="btn btn-primary" data-act="go" data-id="confirm">See the split</button>
+      <button class="btn btn-quiet" data-act="go" data-id="poll">Run a new poll</button>` : `<button class="btn btn-primary" data-act="go" data-id="poll" ${v.items.length ? '' : 'disabled'}>
         <span style="font:500 12px var(--mono);color:rgba(255,255,255,.7)">TG</span>Send poll to the group
       </button>
-      <button class="btn btn-quiet" data-act="go" data-id="confirm">Skip the poll — split ${v.members.length} ways</button>
+      <button class="btn btn-quiet" data-act="go" data-id="confirm">Skip the poll — split ${v.members.length} ways</button>`}
     </div>
   </div>`;
 }
@@ -570,6 +583,21 @@ function screenManual() {
     </div>
     <div class="grow"></div>
     <button class="btn btn-primary" data-act="add-item">Add to receipt</button>
+  </div>`;
+}
+
+// Re-polling wipes the old votes (B14); say so before it happens.
+function replacePanel(v) {
+  const people = new Set(v.optOuts.map((o) => o.memberId)).size;
+  return `<div style="padding:15px;border-radius:14px;background:var(--accent-soft);border:1px solid var(--danger-border);display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <div style="font:600 15px var(--ui);color:var(--accent-deep)">Send a new poll?</div>
+      <div style="font:400 12.5px/1.45 var(--ui);color:#A0543A;text-wrap:pretty">This replaces the old poll and clears ${v.optOuts.length} opt-out${v.optOuts.length === 1 ? '' : 's'} from ${people} ${people === 1 ? 'person' : 'people'}.</div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button data-act="keep-votes" style="flex:1;height:46px;border-radius:12px;background:var(--card);border:1px solid var(--danger-border);font:600 15px var(--ui);color:var(--ink-60)">Keep the votes</button>
+      <button data-act="replace-poll" style="flex:1;height:46px;border-radius:12px;background:var(--danger);color:#fff;font:600 15px var(--ui)">Replace</button>
+    </div>
   </div>`;
 }
 
@@ -631,7 +659,8 @@ function screenPoll() {
 
     <div class="grow"></div>
     <div class="sticky-foot">
-      <button class="btn btn-primary" data-act="send-poll" ${S.selected.length && sizes.length <= 15 ? '' : 'disabled'}>
+      ${S.confirmReplace ? replacePanel(v) : ''}
+      <button class="btn btn-primary" data-act="send-poll" ${S.confirmReplace ? 'style="display:none"' : ''} ${S.selected.length && sizes.length <= 15 ? '' : 'disabled'}>
         ${sizes.length > 15 ? 'Too many for 15 polls — pick fewer' : S.selected.length ? 'Post ' + (sizes.length > 1 ? sizes.length + ' polls' : 'poll') + ' to the group' : 'Pick at least one item'}
       </button>
       <button class="btn btn-quiet" data-act="go" data-id="confirm">Skip — split ${v.members.length} ways</button>
@@ -641,7 +670,7 @@ function screenPoll() {
 
 function screenLive() {
   const v = S.view;
-  const voters = v.members.filter((m) => m.id !== v.receipt.grocer_id);
+  const voters = v.members; // the payer votes like everyone else
   const votedCount = v.voterIds.length;
   const allIn = votedCount >= voters.length;
   const closesIn = v.receipt.poll_closes_at
@@ -652,6 +681,7 @@ function screenLive() {
 
   const rid = v.receipt.id;
   const sending = v.receipt.status === 'posting';
+  const closed = v.receipt.status !== 'polling' && v.receipt.status !== 'posting';
   const many = (v.pollCount || 1) > 1 && Array.isArray(v.polls) && v.polls.length > 1;
   const polled = v.items.filter((i) => v.polledItemIds.includes(i.id));
   const groups = many
@@ -678,36 +708,37 @@ function screenLive() {
       <div style="display:flex;align-items:center;gap:12px">
         <button class="back" data-act="go" data-id="home">&larr;</button>
         <div style="flex:1;display:flex;flex-direction:column;gap:1px">
-          <div class="title">Poll is live</div>
-          <div class="meta" style="letter-spacing:normal">${votedCount} OF ${voters.length} VOTED${sending ? ' · SENDING POLL…' : closesLabel}</div>
+          <div class="title">${closed ? 'Poll closed' : 'Poll is live'}</div>
+          <div class="meta" style="letter-spacing:normal">${votedCount} OF ${voters.length} VOTED${sending ? ' · SENDING POLL…' : closed ? '' : closesLabel}</div>
         </div>
       </div>
     </div>
 
     <div style="padding:16px var(--gutter) 0;display:flex;flex-direction:column;gap:11px">
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:6px">
         ${voters.map((m) => {
           const voted = v.voterIds.includes(m.id);
           const done = (v.voteProgress && v.voteProgress[m.id]) || 0;
           const partial = !voted && done > 0;
           const outs = v.optOuts.filter((o) => o.memberId === m.id).length;
-          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 4px;border-radius:12px;background:${voted ? 'var(--card)' : '#F1EDE5'};border:1px solid ${voted ? 'var(--line)' : '#E7E2D9'};${voted && fresh(rid + 'v' + m.id) ? 'animation:gsIn .3s ease both' : ''}">
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 2px;border-radius:12px;background:${voted ? 'var(--card)' : '#F1EDE5'};border:1px solid ${voted ? 'var(--line)' : '#E7E2D9'};${voted && fresh(rid + 'v' + m.id) ? 'animation:gsIn .3s ease both' : ''}">
             <div class="avatar" style="width:30px;height:30px;background:${voted || partial ? esc(m.avatar_color) : 'var(--dash)'};font-size:12px">${esc(m.initial)}</div>
             <div style="font:500 10px var(--mono);color:${voted || partial ? 'var(--ink-60)' : 'var(--ink-25)'}">${voted ? (outs ? outs + ' OUT' : 'ALL IN') : partial ? done + '/' + v.pollCount : '…'}</div>
+            ${m.id === v.receipt.grocer_id ? '<div style="font:500 8px var(--mono);letter-spacing:.06em;color:var(--ink-meta);margin-top:-3px">PAID</div>' : ''}
           </div>`;
         }).join('')}
       </div>
 
       <div class="meta" style="margin-top:6px">OPT-OUTS COMING IN</div>
-      ${groups.map((g) => (many ? `<div class="meta" style="margin-top:4px">POLL ${g.part} OF ${v.pollCount}</div>` : '') + g.items.map(card).join('')).join('')}
+      ${groups.filter((g) => g.items.length).map((g) => (many ? `<div class="meta" style="margin-top:4px">POLL ${g.part} OF ${v.pollCount}</div>` : '') + g.items.map(card).join('')).join('')}
     </div>
 
     <div class="grow"></div>
     <div class="sticky-foot">
-      <div style="font:400 12px var(--ui);color:var(--ink-60);text-align:center">${allIn
+      <div style="font:400 12px var(--ui);color:var(--ink-60);text-align:center">${closed ? 'Poll closed. Anyone who didn\u2019t vote stayed in.' : allIn
         ? 'Everyone voted — opening the split…'
         : 'Waiting on ' + (voters.length - votedCount) + ' of ' + voters.length + '. Anyone who never votes stays in.'}</div>
-      <button class="btn ${allIn ? 'btn-primary' : 'btn-ink'}" data-act="close-poll" ${sending ? 'disabled' : ''}>${allIn ? 'See the split' : 'Close poll early · ' + votedCount + '/' + voters.length + ' in'}</button>
+      <button class="btn ${allIn || closed ? 'btn-primary' : 'btn-ink'}" data-act="${closed ? 'go" data-id="confirm' : 'close-poll'}" ${sending ? 'disabled' : ''}>${allIn || closed ? 'See the split' : 'Close poll early · ' + votedCount + '/' + voters.length + ' in'}</button>
     </div>
   </div>`;
 }
@@ -758,7 +789,7 @@ function screenConfirm() {
               <div style="font:600 17px var(--mono);font-variant-numeric:tabular-nums;color:${isGrocer ? 'var(--ink-40)' : 'var(--ink)'}" data-count="share-${m.id}" data-cents="${sh.cents}">${fmt(sh.cents)}</div>
             </div>
             <div style="padding-left:30px;font:400 11px var(--mono);letter-spacing:.04em;color:var(--ink-meta)">${isGrocer
-              ? 'PAID ' + fmt(v.split.totalCents) + ' · KEEPS THE ROUNDING'
+              ? sh.itemCount + ' OF ' + v.items.length + ' ITEMS · PAID ' + fmt(v.split.totalCents) + ' · KEEPS THE ROUNDING'
               : sh.itemCount + ' OF ' + v.items.length + ' ITEMS' + (v.receipt.tax_enabled ? ' · +' + fmt(sh.taxCents) + ' TAX' : '')}</div>
           </div>`;
         }).join('')}
@@ -1121,6 +1152,7 @@ document.addEventListener('click', (e) => {
   const a = el.getAttribute('data-act');
   const id = Number(el.getAttribute('data-id'));
 
+  const sendPoll = () => handlers.__sendPollBody();
   const handlers = {
     go: () => {
       const target = el.getAttribute('data-id');
@@ -1137,7 +1169,7 @@ document.addEventListener('click', (e) => {
     open: () => act(async () => {
       await loadReceipt(id);
       const r = S.view.receipt;
-      go(r.status === 'confirmed' ? 'export' : r.status === 'polling' || r.status === 'posting' ? 'live' : 'review');
+      go(r.status === 'confirmed' ? 'export' : r.status === 'polling' || r.status === 'posting' ? 'live' : S.view.pollCount > 0 ? 'confirm' : 'review');
     }),
 
     'new-sheet': () => { S.newSheet = true; S.grocerDraft = meId(); render(); },
@@ -1259,7 +1291,13 @@ document.addEventListener('click', (e) => {
       S.selected = S.selected.length ? [] : S.view.items.map((i) => i.id);
       render();
     },
-    'send-poll': () => act(async () => {
+    'send-poll': () => {
+      if (S.view.pollCount > 0) { S.confirmReplace = true; render(); return; }
+      sendPoll();
+    },
+    'keep-votes': () => { S.confirmReplace = false; go('confirm'); },
+    'replace-poll': () => { S.confirmReplace = false; sendPoll(); },
+    '__sendPollBody': () => act(async () => {
       const rid = S.view.receipt.id;
       try {
         S.view = await api('POST', '/api/receipt/' + rid + '/poll', { itemIds: S.selected });

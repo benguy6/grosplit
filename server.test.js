@@ -1242,3 +1242,83 @@ test('B64: after delete-highest + add, a stale PUT carrying the old id gets 409 
   assert.equal(b.status, 409);
   assert.equal(d.items(db, id).find((i) => i.id === steak.id).name, 'steak');
 });
+
+test('poll close posts ONE message to the group (deadline, early close, confirm), none in DEV; state rows carry pollCount', async () => {
+  const msgs = [];
+  const real = tgMod.sendMessage;
+  tgMod.sendMessage = async (_t, chat, text) => { msgs.push([chat, text]); return { message_id: 1 }; };
+  try {
+    await withTelegram(async () => {
+      const ms = (await api('GET', '/api/state')).body.members;
+      const { id, items } = await mkReceipt('Close Mart', manyItems(2));
+      await api('POST', `/api/receipt/${id}/poll`, { itemIds: items.map((i) => i.id) });
+      const [p] = d.polls(db, id);
+      await answerAs(ms[1], p.telegram_poll_id, [0]);
+      let st = (await api('GET', '/api/state')).body.receipts.find((r) => r.id === id);
+      assert.equal(st.pollCount, 1);
+      assert.equal(st.votedCount, 1);
+
+      // early close, twice: one message
+      await api('POST', `/api/receipt/${id}/close-poll`);
+      await api('POST', `/api/receipt/${id}/close-poll`);
+      assert.equal(msgs.length, 1);
+      assert.equal(msgs[0][0], '-100');
+      assert.equal(msgs[0][1], `🗳 Poll closed for Close Mart. 1 of ${ms.length} voted. ${ms[0].name}, the split is ready to lock.`);
+
+      // deadline: swept on the next request, once
+      const two = await mkReceipt('Deadline Mart', manyItems(2));
+      await api('POST', `/api/receipt/${two.id}/poll`, { itemIds: two.items.map((i) => i.id) });
+      db.prepare('UPDATE receipt SET poll_closes_at = ? WHERE id = ?').run(Math.floor(Date.now() / 1000) - 5, two.id);
+      await api('GET', '/api/state');
+      await api('GET', '/api/state');
+      assert.equal(msgs.filter((m) => /Deadline Mart/.test(m[1])).length, 1);
+
+      // confirm while polling
+      const three = await mkReceipt('Confirm Mart', manyItems(2));
+      await api('POST', `/api/receipt/${three.id}/poll`, { itemIds: three.items.map((i) => i.id) });
+      await api('POST', `/api/receipt/${three.id}/confirm`);
+      assert.equal(msgs.filter((m) => /Confirm Mart/.test(m[1])).length, 1);
+    });
+    // DEV: nothing is sent.
+    const before = msgs.length;
+    const dev = await mkReceipt('Dev Mart', manyItems(2));
+    await api('POST', `/api/receipt/${dev.id}/poll`, { itemIds: dev.items.map((i) => i.id) });
+    await api('POST', `/api/receipt/${dev.id}/close-poll`);
+    assert.equal(msgs.length, before);
+  } finally { tgMod.sendMessage = real; }
+});
+
+// ── F3: the grocer's answers count ──────────────────────────────────────────
+
+test('F3: the grocer can vote; their opt-outs count, and they count as voted', async () => {
+  await withTelegram(async () => {
+    const { id, items } = await mkReceipt('F3 Mart', [{ name: 'Wine', priceCents: 3000 }, { name: 'Rice', priceCents: 600 }]);
+    await api('POST', `/api/receipt/${id}/poll`, { itemIds: items.map((i) => i.id) });
+    const [p] = d.polls(db, id);
+    const ms = (await api('GET', '/api/state')).body.members;
+    const grocer = ms[0]; // Ben created the receipt and is its grocer
+    const before = (await api('GET', `/api/receipt/${id}`)).body;
+    await answerAs(grocer, p.telegram_poll_id, [0]); // out of the wine
+    const v = (await api('GET', `/api/receipt/${id}`)).body;
+    assert.deepEqual(v.optOuts.map((o) => [o.itemId, o.memberId]), [[items[0].id, grocer.id]]);
+    assert.deepEqual(v.voterIds, [grocer.id]);
+    assert.equal(v.voteProgress[grocer.id], 1);
+    assert.ok(v.split.shares[grocer.id].cents < before.split.shares[grocer.id].cents, 'their share dropped');
+    assert.equal(Object.values(v.split.shares).reduce((s, x) => s + x.cents, 0), v.split.totalCents);
+    assert.equal(v.split.totalCents, 3600, 'the grocer still pays it all');
+  });
+});
+
+test('F3: a receipt locked before the change keeps its frozen numbers', async () => {
+  const { id, items } = await mkReceipt('Legacy Mart', [{ name: 'Wine', priceCents: 3000 }, { name: 'Rice', priceCents: 600 }]);
+  await api('POST', `/api/receipt/${id}/poll`, { itemIds: [items[0].id] });
+  const r = d.receipt(db, id);
+  // Under the old rule the grocer's opt-out was ignored when this receipt was locked.
+  const legacy = d.freezeSplit(db, id); // no grocer opt-out yet: the old numbers
+  db.prepare('INSERT INTO opt_out (receipt_id, item_id, member_id) VALUES (?, ?, ?)').run(id, items[0].id, r.grocer_id);
+  const live = d.computeReceiptSplit(db, d.receipt(db, id), d.members(db, r.household_id));
+  assert.notDeepEqual(live, legacy.split, 'a fresh recompute would now differ');
+  db.prepare("UPDATE receipt SET status = 'confirmed' WHERE id = ?").run(id);
+  const v = (await api('GET', `/api/receipt/${id}`)).body;
+  assert.deepEqual(v.split, legacy.split);
+});

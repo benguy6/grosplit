@@ -100,16 +100,21 @@ test('invariant 2: an item can never have zero participants', () => {
   assert.equal(sumShares(r), 600);
 });
 
-test('the grocer cannot opt out of their own receipt', () => {
-  const withGrocerOptOut = computeSplit({
+test('the grocer can opt out; the rest cover it, and the shares still sum to the total', () => {
+  const run = (optOuts) => computeSplit({
     members: MEMBERS, items: [{ id: 1, priceCents: 600 }],
-    optOuts: [{ itemId: 1, memberId: 'ben' }], polledItemIds: [1], grocerId: 'ben',
+    optOuts, polledItemIds: [1], grocerId: 'ben',
   });
-  const withNone = computeSplit({
-    members: MEMBERS, items: [{ id: 1, priceCents: 600 }],
-    optOuts: [], polledItemIds: [1], grocerId: 'ben',
-  });
-  assert.deepEqual(withGrocerOptOut.shares, withNone.shares, 'grocer opt-out must be ignored');
+  const withNone = run([]);
+  const out = run([{ itemId: 1, memberId: 'ben' }]);
+  assert.equal(out.totalCents, 600, 'the grocer still pays the whole receipt');
+  assert.equal(sumShares(out), 600);
+  assert.ok(out.shares.ben.cents < withNone.shares.ben.cents, 'their own share is smaller');
+  assert.equal(out.shares.ben.itemCount, 0);
+  for (const m of MEMBERS.filter((m) => m.id !== 'ben')) {
+    assert.ok(out.shares[m.id].cents > withNone.shares[m.id].cents, m.id + ' covers a bit more');
+  }
+  assertSound(out, 'grocer out');
 });
 
 test('opt-outs are ignored on items that were never polled', () => {

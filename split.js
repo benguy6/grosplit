@@ -45,21 +45,17 @@ function computeSplit({
   for (const item of items) {
     subtotalCents += item.priceCents;
 
-    // Opt-outs only count on items that actually went into the poll, and the
-    // grocer can never opt out of a receipt they paid for.
+    // Opt-outs only count on items that actually went into the poll. The grocer can opt
+    // out like anyone else: they still pay the whole receipt and keep the rounding
+    // remainder, but their own share leaves out what they opted out of.
     const out = polled.has(item.id)
-      ? new Set(
-          optOuts
-            .filter((o) => o.itemId === item.id && o.memberId !== grocerId)
-            .map((o) => o.memberId),
-        )
+      ? new Set(optOuts.filter((o) => o.itemId === item.id).map((o) => o.memberId))
       : new Set();
 
     let participants = members.filter((m) => !out.has(m.id));
 
-    // Invariant: an item can never have zero participants. Excluding the grocer
-    // from `out` already guarantees this; the floor is here so the guarantee is
-    // structural rather than a consequence of the line above staying correct.
+    // Invariant: an item can never have zero participants. If literally everyone opted
+    // out, it is split between everyone.
     if (participants.length === 0) participants = members;
 
     const each = item.priceCents / participants.length;

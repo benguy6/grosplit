@@ -480,3 +480,65 @@ test('B64 migration: an old (non-AUTOINCREMENT) database is rebuilt in place, ke
   m.close();
   for (const s of ['', '-wal', '-shm']) fs.rmSync(p + s, { force: true, maxRetries: 5, retryDelay: 100 });
 });
+
+test('B68: a line waiting on another receipt\'s lookup counts as pending for its own receipt', async () => {
+  for (const fail of [false, true]) {
+    db.exec('DELETE FROM product_lookup; DELETE FROM lookup_call');
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    stubFetch(async (n, init) => { await gate; if (fail) throw new Error('boom'); return good(n, init); });
+    const a = mk('Costco', [line('KS U/S QTRS', '6868' + (fail ? 1 : 0))]);
+    const b = mk('Costco', [line('KS U/S QTRS', '6868' + (fail ? 1 : 0))]);
+    lookup.afterScan(db, a, opts);
+    lookup.afterScan(db, b, opts); // waits on a's lookup
+    assert.equal(lookup.pending(a), 1);
+    assert.equal(lookup.pending(b), 1, 'b polls too');
+    release();
+    await lookup.whenIdle();
+    assert.equal(lookup.pending(a), 0);
+    assert.equal(lookup.pending(b), 0, 'released on ' + (fail ? 'failure' : 'success'));
+  }
+});
+
+test('B67: an orphan in an unrelated table does not block the rebuild; an orphan opt_out rolls back without crashing', () => {
+  const { DatabaseSync } = require('node:sqlite');
+  const mkOld = (name) => {
+    const p = path.join(os.tmpdir(), 'grosplit-b67-' + name + '-' + process.pid + '.db');
+    const old = new DatabaseSync(p);
+    old.exec(d.SCHEMA.replace('id          INTEGER PRIMARY KEY AUTOINCREMENT,', 'id          INTEGER PRIMARY KEY,'));
+    old.exec(`
+      PRAGMA foreign_keys = OFF;
+      INSERT INTO household (id, name) VALUES (1, 'h');
+      INSERT INTO member (id, household_id, name, initial, avatar_color) VALUES (1, 1, 'A', 'A', '#000');
+      INSERT INTO receipt (id, household_id, store, created_at, grocer_id) VALUES (1, 1, 's', 0, 1);
+      INSERT INTO item (id, receipt_id, name, price_cents) VALUES (10, 1, 'a', 100);
+      INSERT INTO poll (id, receipt_id, part) VALUES (1, 1, 1);
+    `);
+    return { p, old };
+  };
+  const clean = (p) => { for (const s of ['', '-wal', '-shm']) fs.rmSync(p + s, { force: true, maxRetries: 5, retryDelay: 100 }); };
+  const warns = [];
+  const realWarn = console.warn;
+  console.warn = (...a) => warns.push(a.join(' '));
+  try {
+    // 1. orphan voter (member 99 doesn't exist): unrelated to item, must not block.
+    const one = mkOld('voter');
+    one.old.exec('INSERT INTO poll_voter VALUES (1, 99, 1)');
+    one.old.close();
+    const m1 = d.open(one.p);
+    assert.match(m1.prepare("SELECT sql FROM sqlite_master WHERE name = 'item'").get().sql, /AUTOINCREMENT/i);
+    assert.equal(warns.length, 0);
+    m1.close(); clean(one.p);
+
+    // 2. orphan opt_out (item 77 doesn't exist): the rebuild rolls back, opens fine, old schema kept.
+    const two = mkOld('optout');
+    two.old.exec('INSERT INTO opt_out VALUES (1, 77, 1)');
+    two.old.close();
+    const m2 = d.open(two.p);
+    assert.doesNotMatch(m2.prepare("SELECT sql FROM sqlite_master WHERE name = 'item'").get().sql, /AUTOINCREMENT/i);
+    assert.equal(m2.prepare('SELECT COUNT(*) n FROM item').get().n, 1, 'data intact');
+    assert.equal(m2.prepare('PRAGMA foreign_keys').get().foreign_keys, 1);
+    assert.equal(warns.filter((w) => /rebuild skipped/.test(w)).length, 1);
+    m2.close(); clean(two.p);
+  } finally { console.warn = realWarn; }
+});

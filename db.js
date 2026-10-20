@@ -178,11 +178,17 @@ function rebuildItemAutoincrement(db) {
       // Copying explicit ids already set sqlite_sequence to max(id); make sure it can only be higher.
       const max = db.prepare('SELECT COALESCE(MAX(id), 0) AS m FROM item').get().m;
       db.prepare("UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'item'").run(max);
-      if (db.prepare('PRAGMA foreign_key_check').all().length) throw new Error('foreign_key_check failed after rebuilding item');
+      // Only the tables that point at item: an unrelated orphan elsewhere must not block a boot.
+      if (db.prepare('PRAGMA foreign_key_check(polled_item)').all().length ||
+          db.prepare('PRAGMA foreign_key_check(opt_out)').all().length) {
+        throw new Error('foreign_key_check failed after rebuilding item');
+      }
       db.exec('COMMIT');
     } catch (e) {
+      // Never crash-loop the server over this: undo, say so once, and run on the old schema
+      // (ids can be reused there, which is the pre-fix behaviour). It retries on the next boot.
       db.exec('ROLLBACK');
-      throw e;
+      console.warn('item AUTOINCREMENT rebuild skipped:', e.message);
     }
   } finally {
     db.exec('PRAGMA foreign_keys = ON');
