@@ -26,6 +26,9 @@ const S = {
   newSheet: false,
   payerSheet: false,   // review: change who paid
   confirmDeleteReceipt: false,
+  outsFor: null,           // member whose opt-outs the sheet is editing
+  outsSel: [],             // item ids ticked in that sheet
+  outsSeen: '',            // that member's opt-outs when the sheet opened, to spot someone else's edit
   confirmReplace: false,   // poll composer: replacing a poll that already ran
   grocerDraft: null,
   scanning: false,
@@ -96,7 +99,7 @@ function stopLive() { clearInterval(liveTimer); liveTimer = null; }
 // Sheets and armed confirmations belong to one screen of one receipt; never carry them over.
 function resetTransient() {
   S.newSheet = false; S.payerSheet = false; S.editId = null;
-  S.confirmDelete = false; S.confirmDeleteReceipt = false; S.confirmReplace = false; S.colorFor = null;
+  S.confirmDelete = false; S.confirmDeleteReceipt = false; S.confirmReplace = false; S.outsFor = null; S.colorFor = null;
 }
 
 async function go(screen) {
@@ -592,7 +595,7 @@ function replacePanel(v) {
   return `<div style="padding:15px;border-radius:14px;background:var(--accent-soft);border:1px solid var(--danger-border);display:flex;flex-direction:column;gap:12px">
     <div style="display:flex;flex-direction:column;gap:3px">
       <div style="font:600 15px var(--ui);color:var(--accent-deep)">Send a new poll?</div>
-      <div style="font:400 12.5px/1.45 var(--ui);color:#A0543A;text-wrap:pretty">This replaces the old poll and clears ${v.optOuts.length} opt-out${v.optOuts.length === 1 ? '' : 's'} from ${people} ${people === 1 ? 'person' : 'people'}.</div>
+      <div style="font:400 12.5px/1.45 var(--ui);color:#A0543A;text-wrap:pretty">This replaces the old poll and clears ${v.optOuts.length} opt-out${v.optOuts.length === 1 ? '' : 's'} from ${people} ${people === 1 ? 'person' : 'people'} (including any set by hand).</div>
     </div>
     <div style="display:flex;gap:10px">
       <button data-act="keep-votes" style="flex:1;height:46px;border-radius:12px;background:var(--card);border:1px solid var(--danger-border);font:600 15px var(--ui);color:var(--ink-60)">Keep the votes</button>
@@ -721,7 +724,7 @@ function screenLive() {
           const done = (v.voteProgress && v.voteProgress[m.id]) || 0;
           const partial = !voted && done > 0;
           const outs = v.optOuts.filter((o) => o.memberId === m.id).length;
-          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 2px;border-radius:12px;background:${voted ? 'var(--card)' : '#F1EDE5'};border:1px solid ${voted ? 'var(--line)' : '#E7E2D9'};${voted && fresh(rid + 'v' + m.id) ? 'animation:gsIn .3s ease both' : ''}">
+          return `<div ${closed && v.receipt.status === 'review' ? `data-act="edit-outs" data-id="${m.id}"` : ''} style="cursor:${closed ? 'pointer' : 'default'};flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 2px;border-radius:12px;background:${voted ? 'var(--card)' : '#F1EDE5'};border:1px solid ${voted ? 'var(--line)' : '#E7E2D9'};${voted && fresh(rid + 'v' + m.id) ? 'animation:gsIn .3s ease both' : ''}">
             <div class="avatar" style="width:30px;height:30px;background:${voted || partial ? esc(m.avatar_color) : 'var(--dash)'};font-size:12px">${esc(m.initial)}</div>
             <div style="font:500 10px var(--mono);color:${voted || partial ? 'var(--ink-60)' : 'var(--ink-25)'}">${voted ? (outs ? outs + ' OUT' : 'ALL IN') : partial ? done + '/' + v.pollCount : '…'}</div>
             ${m.id === v.receipt.grocer_id ? '<div style="font:500 8px var(--mono);letter-spacing:.06em;color:var(--ink-meta);margin-top:-3px">PAID</div>' : ''}
@@ -780,7 +783,8 @@ function screenConfirm() {
         ${v.members.map((m) => {
           const sh = v.split.shares[m.id];
           const isGrocer = m.id === v.receipt.grocer_id;
-          return `<div style="display:flex;flex-direction:column;gap:3px">
+          const editable = v.receipt.status === 'review';
+          return `<div ${editable ? `data-act="edit-outs" data-id="${m.id}"` : ''} style="display:flex;flex-direction:column;gap:3px;${editable ? 'cursor:pointer;min-height:44px;justify-content:center' : ''}">
             <div style="display:flex;align-items:baseline;gap:8px">
               ${avatar(m, 22, 'align-self:center')}
               <div style="font:500 13.5px var(--mono);letter-spacing:.02em">${esc(upper(m.name))}${m.id === meId() ? ' (YOU)' : ''}</div>
@@ -790,7 +794,7 @@ function screenConfirm() {
             </div>
             <div style="padding-left:30px;font:400 11px var(--mono);letter-spacing:.04em;color:var(--ink-meta)">${isGrocer
               ? sh.itemCount + ' OF ' + v.items.length + ' ITEMS · PAID ' + fmt(v.split.totalCents) + ' · KEEPS THE ROUNDING'
-              : sh.itemCount + ' OF ' + v.items.length + ' ITEMS' + (v.receipt.tax_enabled ? ' · +' + fmt(sh.taxCents) + ' TAX' : '')}</div>
+              : sh.itemCount + ' OF ' + v.items.length + ' ITEMS' + (v.receipt.tax_enabled ? ' · +' + fmt(sh.taxCents) + ' TAX' : '')}${editable ? ' · <span style="color:var(--ink-60);text-decoration:underline">EDIT</span>' : ''}</div>
           </div>`;
         }).join('')}
         <div style="margin-top:2px;border-top:1px dashed var(--dot);border-bottom:3px double var(--dash);padding:9px 0;display:flex;justify-content:space-between;font:500 11.5px var(--mono);letter-spacing:.08em">
@@ -1023,6 +1027,33 @@ function payerSheet() {
   </div>`;
 }
 
+const outsKey = (v, mid) => v.optOuts.filter((o) => o.memberId === mid).map((o) => o.itemId).sort((a, b) => a - b).join(',');
+
+// Hand-edit one housemate's opt-outs (split screen, review only).
+function outsSheet() {
+  if (!S.outsFor || !S.view) return '';
+  const m = memberById(S.outsFor) || S.view.members.find((x) => x.id === S.outsFor);
+  if (!m) return '';
+  return `<div class="scrim" data-act="cancel-outs" style="background:rgba(28,26,23,.34)">
+    <div class="sheet" data-stop style="display:flex;flex-direction:column;overflow:hidden;max-height:min(85dvh,720px);padding-bottom:0">
+      <div class="grab" style="flex:none"></div>
+      <div class="title">${esc(m.name)} is out of\u2026</div>
+      <div style="font:400 12.5px/1.45 var(--ui);color:var(--ink-60);margin-top:4px">Tick the lines ${esc(m.name)} isn\u2019t paying for.</div>
+      <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-top:14px;padding-bottom:4px">
+        ${S.view.items.map((it) => {
+          const on = S.outsSel.includes(it.id);
+          return `<button class="item-row ${on ? 'picked' : ''}" data-act="toggle-out" data-id="${it.id}" style="border-left-width:1px;min-height:48px">
+            <span class="box ${on ? '' : 'empty'}">${on ? '\u2713' : ''}</span>
+            <span style="flex:1;font:500 15px var(--ui);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left">${esc(it.name)}</span>
+            <span class="money" style="font-size:15px;color:var(--ink-60)">${fmt(it.price_cents)}</span>
+          </button>`;
+        }).join('')}
+      </div>
+      <div style="flex:none;border-top:1px solid var(--line);padding:12px 0 calc(18px + env(safe-area-inset-bottom))"><button class="btn btn-primary" data-act="save-outs">Save</button></div>
+    </div>
+  </div>`;
+}
+
 function editSheet() {
   if (!S.editId || !S.view) return '';
   const it = S.view.items.find((i) => i.id === S.editId);
@@ -1094,7 +1125,7 @@ function render() {
   const toastHtml = S.toast
     ? `<div class="toast"><span class="check">✓</span><span style="flex:1">${esc(S.toast)}</span></div>`
     : '';
-  app.innerHTML = body + newSheet() + payerSheet() + editSheet() + toastHtml;
+  app.innerHTML = body + newSheet() + payerSheet() + outsSheet() + editSheet() + toastHtml;
   animateCounts();
 
   const storeInput = document.getElementById('store-draft');
@@ -1196,6 +1227,45 @@ document.addEventListener('click', (e) => {
       S.editSeen = it ? { name: it.name, price: it.price_cents } : null; // what the sheet opened with
       render();
     },
+    'edit-outs': () => {
+      if (S.view.receipt.status !== 'review') return;
+      S.outsFor = id;
+      S.outsSel = S.view.optOuts.filter((o) => o.memberId === id).map((o) => o.itemId);
+      S.outsSeen = outsKey(S.view, id);
+      render();
+    },
+    'cancel-outs': () => { if (!stop) { S.outsFor = null; render(); } },
+    'toggle-out': () => {
+      // Flip in place: re-rendering would reset the sheet's scroll.
+      const on = !S.outsSel.includes(id);
+      S.outsSel = on ? S.outsSel.concat([id]) : S.outsSel.filter((x) => x !== id);
+      el.classList.toggle('picked', on);
+      const box = el.querySelector('.box');
+      box.classList.toggle('empty', !on);
+      box.textContent = on ? '\u2713' : '';
+    },
+    'save-outs': () => act(async () => {
+      const who = memberById(S.outsFor);
+      const mid = S.outsFor;
+      await freshen();
+      if (outsKey(S.view, mid) !== S.outsSeen) {
+        // Someone else edited this person meanwhile: show theirs, don't overwrite.
+        S.outsSel = S.view.optOuts.filter((o) => o.memberId === mid).map((o) => o.itemId);
+        S.outsSeen = outsKey(S.view, mid);
+        return toast('Someone else just changed this. Check and save again.');
+      }
+      const have = new Set(S.view.items.map((i) => i.id));
+      try {
+        S.view = await api('PUT', '/api/receipt/' + S.view.receipt.id + '/optouts/' + mid, {
+          itemIds: S.outsSel.filter((x) => have.has(x)), knownIds: S.view.items.map((i) => i.id),
+        });
+      } catch (e) {
+        if (e.code === 'stale') { await loadReceipt(S.view.receipt.id); await refreshState(); }
+        throw e;
+      }
+      S.outsFor = null;
+      toast((who ? who.name : 'Their') + '\u2019s opt-outs saved');
+    }),
     'cancel-edit': () => { if (!stop) { S.editId = null; S.confirmDelete = false; render(); } },
     'use-guess': () => {
       const it = S.view.items.find((i) => i.id === S.editId);

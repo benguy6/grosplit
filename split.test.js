@@ -117,12 +117,14 @@ test('the grocer can opt out; the rest cover it, and the shares still sum to the
   assertSound(out, 'grocer out');
 });
 
-test('opt-outs are ignored on items that were never polled', () => {
+test('opt-outs count on any item, polled or not (hand edits)', () => {
   const r = computeSplit({
     members: MEMBERS, items: [{ id: 1, priceCents: 600 }],
-    optOuts: [{ itemId: 1, memberId: 'kai' }], polledItemIds: [], grocerId: 'ben',
+    optOuts: [{ itemId: 1, memberId: 'kai' }], grocerId: 'ben',
   });
-  assert.equal(r.shares.kai.cents, 100, 'a non-voter on an unpolled item still pays');
+  assert.equal(r.shares.kai.cents, 0, 'kai is out of the only item');
+  assert.equal(sumShares(r), 600);
+  assertSound(r, 'unpolled opt-out');
 });
 
 test('non-voters stay IN — only recorded opt-outs reduce a share', () => {

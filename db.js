@@ -242,7 +242,6 @@ function computeReceiptSplit(db, r, memberList) {
     members: memberList.map((m) => ({ id: m.id })),
     items: items(db, r.id).map((i) => ({ id: i.id, priceCents: i.price_cents })),
     optOuts: optOuts(db, r.id).map((o) => ({ itemId: o.item_id, memberId: o.member_id })),
-    polledItemIds: polledItems(db, r.id).map((p) => p.item_id),
     grocerId: r.grocer_id,
     taxCents: r.tax_enabled ? r.tax_cents : 0,
     taxMode: r.tax_mode,

@@ -203,7 +203,7 @@ const editable = (r) => r.status === 'review';
 async function api(req, res, url, me) {
   await sweepExpiredPolls();
   const seg = url.pathname.split('/').filter(Boolean); // ['api', ...]
-  const [, head, idRaw, tail] = seg;
+  const [, head, idRaw, tail, tailId] = seg;
   const id = Number(idRaw);
 
   if (head === 'state' && req.method === 'GET') {
@@ -324,6 +324,36 @@ async function api(req, res, url, me) {
       }
       db.prepare('DELETE FROM receipt WHERE id = ?').run(id);
       return ok(res, { ok: true });
+    }
+
+    // Hand-edit one member's opt-outs: replaces their set on this receipt (F5).
+    if (tail === 'optouts' && req.method === 'PUT') {
+      const target = db.prepare('SELECT * FROM member WHERE id = ?').get(Number(tailId));
+      if (!target || target.household_id !== me.household_id) return fail(res, 404, 'no such member');
+      if (r.status === 'polling' || r.status === 'posting') return fail(res, 409, 'close the poll first');
+      if (r.status !== 'review') return fail(res, 409, 'this split is locked');
+      const b = await readJson(req);
+      if (!Array.isArray(b.itemIds) || !b.itemIds.every(Number.isInteger)) return fail(res, 400, 'itemIds (array of item ids) required');
+      const current = new Set(d.items(db, id).map((i) => i.id));
+      if (b.knownIds !== undefined) {
+        const known = new Set(Array.isArray(b.knownIds) ? b.knownIds : []);
+        if (known.size !== current.size || ![...known].every((k) => current.has(k))) {
+          return send(res, 409, { error: "Someone else just changed this receipt. Here's the latest.", code: 'stale' });
+        }
+      }
+      const wanted = [...new Set(b.itemIds)];
+      if (!wanted.every((x) => current.has(x))) return fail(res, 400, 'unknown item in selection');
+      db.exec('BEGIN');
+      try {
+        db.prepare('DELETE FROM opt_out WHERE receipt_id = ? AND member_id = ?').run(id, target.id);
+        const ins = db.prepare('INSERT INTO opt_out (receipt_id, item_id, member_id) VALUES (?, ?, ?)');
+        for (const itemId of wanted) ins.run(id, itemId, target.id);
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      }
+      return ok(res, receiptView(id, me)); // poll_voter untouched: a hand edit is not a poll answer
     }
 
     if (tail === 'scan' && req.method === 'POST') {

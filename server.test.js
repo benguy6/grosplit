@@ -1322,3 +1322,67 @@ test('F3: a receipt locked before the change keeps its frozen numbers', async ()
   const v = (await api('GET', `/api/receipt/${id}`)).body;
   assert.deepEqual(v.split, legacy.split);
 });
+
+// ── F5: hand-edited opt-outs ────────────────────────────────────────────────
+
+test('F5: PUT optouts replaces one member\'s set, on any line, leaving others and poll_voter alone', async () => {
+  const { id, items } = await mkReceipt('F5 Mart', [
+    { name: 'a', priceCents: 600 }, { name: 'b', priceCents: 600 }, { name: 'c', priceCents: 600 },
+  ]);
+  const ms = (await api('GET', '/api/state')).body.members;
+  const [a, b, c] = items;
+  const put = (memberId, body) => api('PUT', `/api/receipt/${id}/optouts/${memberId}`, body);
+  const base = (await api('GET', `/api/receipt/${id}`)).body;
+
+  let r = await put(ms[1].id, { itemIds: [a.id, b.id, b.id] }); // dedupes; none of these were polled
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.optOuts.map((o) => [o.itemId, o.memberId]).sort(), [[a.id, ms[1].id], [b.id, ms[1].id]].sort());
+  assert.ok(r.body.split.shares[ms[1].id].cents < base.split.shares[ms[1].id].cents, 'a non-polled opt-out reduces their share');
+  assert.equal(Object.values(r.body.split.shares).reduce((s, x) => s + x.cents, 0), r.body.split.totalCents, 'still sums');
+  assert.deepEqual(r.body.voterIds, [], 'not a poll answer');
+
+  await put(ms[2].id, { itemIds: [c.id] });
+  r = await put(ms[1].id, { itemIds: [b.id] }); // replaces: a dropped
+  assert.deepEqual(r.body.optOuts.map((o) => [o.itemId, o.memberId]).sort(),
+    [[b.id, ms[1].id], [c.id, ms[2].id]].sort(), 'other members untouched');
+  r = await put(ms[1].id, { itemIds: [] }); // empty = in on everything
+  assert.deepEqual(r.body.optOuts.map((o) => o.memberId), [ms[2].id]);
+
+  // validation
+  assert.equal((await put(ms[1].id, { itemIds: [999999] })).status, 400, 'foreign item');
+  assert.equal((await put(ms[1].id, { itemIds: 'x' })).status, 400);
+  assert.equal((await put(999999, { itemIds: [] })).status, 404, 'unknown member');
+  const stranger = d.addMember(db, d.createHousehold(db, { name: 'Other house' }).id, { name: 'Stranger' });
+  assert.equal((await put(stranger.id, { itemIds: [] })).status, 404, 'member of another household');
+  // stale guard
+  const stale = await put(ms[1].id, { itemIds: [a.id], knownIds: [a.id, b.id] });
+  assert.equal(stale.status, 409);
+  assert.equal(stale.body.code, 'stale');
+  assert.equal((await put(ms[1].id, { itemIds: [a.id], knownIds: [a.id, b.id, c.id] })).status, 200);
+});
+
+test('F5: refused while a poll is live and after lock; a frozen split is unaffected', async () => {
+  const { id, items } = await mkReceipt('F5b Mart', [{ name: 'a', priceCents: 600 }, { name: 'b', priceCents: 400 }]);
+  const ms = (await api('GET', '/api/state')).body.members;
+  const put = () => api('PUT', `/api/receipt/${id}/optouts/${ms[1].id}`, { itemIds: [items[0].id] });
+  await api('POST', `/api/receipt/${id}/poll`, { itemIds: [items[0].id] });
+  const live = await put();
+  assert.equal(live.status, 409);
+  assert.match(live.body.error, /close the poll first/);
+  await api('POST', `/api/receipt/${id}/close-poll`);
+  const locked = (await api('POST', `/api/receipt/${id}/confirm`)).body;
+  const late = await put();
+  assert.equal(late.status, 409);
+  assert.match(late.body.error, /locked/);
+  assert.deepEqual((await api('GET', `/api/receipt/${id}`)).body.split, locked.split);
+  assert.equal(d.optOuts(db, id).length, 0);
+});
+
+test('F5: re-polling still clears ALL opt-outs, hand edits included', async () => {
+  const { id, items } = await mkReceipt('F5c Mart', [{ name: 'a', priceCents: 600 }, { name: 'b', priceCents: 400 }]);
+  const ms = (await api('GET', '/api/state')).body.members;
+  await api('PUT', `/api/receipt/${id}/optouts/${ms[1].id}`, { itemIds: [items[1].id] });
+  assert.equal(d.optOuts(db, id).length, 1);
+  const again = await api('POST', `/api/receipt/${id}/poll`, { itemIds: [items[0].id] });
+  assert.equal(again.body.optOuts.length, 0);
+});

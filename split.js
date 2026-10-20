@@ -13,8 +13,7 @@ const TAX_EVEN = 'even'; // flat tax/n each
 /**
  * @param members       [{ id }]                       — the whole household
  * @param items         [{ id, priceCents }]           — line totals, may be negative
- * @param optOuts       [{ itemId, memberId }]         — from the Telegram poll
- * @param polledItemIds [itemId]                       — only these can carry opt-outs
+ * @param optOuts       [{ itemId, memberId }]         — from the Telegram poll or set by hand; count on ANY item
  * @param grocerId      member id who paid for THIS receipt
  * @param taxCents      read off the receipt; 0 when tax isn't split
  * @param taxMode       'pro' | 'even'
@@ -23,7 +22,6 @@ function computeSplit({
   members,
   items,
   optOuts = [],
-  polledItemIds = [],
   grocerId,
   taxCents = 0,
   taxMode = TAX_PRO,
@@ -36,7 +34,6 @@ function computeSplit({
   }
 
   const n = members.length;
-  const polled = new Set(polledItemIds);
   const amt = new Map(members.map((m) => [m.id, 0]));       // fractional cents while accumulating
   const itemCount = new Map(members.map((m) => [m.id, 0]));
 
@@ -45,12 +42,10 @@ function computeSplit({
   for (const item of items) {
     subtotalCents += item.priceCents;
 
-    // Opt-outs only count on items that actually went into the poll. The grocer can opt
-    // out like anyone else: they still pay the whole receipt and keep the rounding
-    // remainder, but their own share leaves out what they opted out of.
-    const out = polled.has(item.id)
-      ? new Set(optOuts.filter((o) => o.itemId === item.id).map((o) => o.memberId))
-      : new Set();
+    // Opt-outs count on any line (a poll answer or a hand edit). The grocer can opt out like
+    // anyone else: they still pay the whole receipt and keep the rounding remainder, but
+    // their own share leaves out what they opted out of.
+    const out = new Set(optOuts.filter((o) => o.itemId === item.id).map((o) => o.memberId));
 
     let participants = members.filter((m) => !out.has(m.id));
 
