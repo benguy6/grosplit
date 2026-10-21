@@ -306,6 +306,9 @@ original review.
 - [x] **F5** Edit opt-outs by hand (owner request 2026-10-19). On the Split screen, tap a housemate → tick the lines they're out of. Anyone in the house can edit anyone's, while the receipt is in review (not during a live poll, never after lock). Hand-set opt-outs count on ANY line, not only polled ones. First use: Raymond's missed poll-3 items on the Costco receipt.
 - [ ] **F6** "Reopen voting" — fresh polls that keep everyone's existing votes (owner deciding: unfinished parts only vs all parts).
 
+### Owner request 2026-10-21
+- [x] **F7** Logo (owner request 2026-10-21): a cramped G made of three torn receipt pieces with print lines, replacing the plain "G" tile. Orange tile on onboarding, ink tile on the not-in-group screen (the button is that screen's accent). Also `/icon.svg` favicon and a 512px PNG for the bot's profile picture (owner sets it in BotFather).
+
 ### P3: housekeeping
 - [x] **B20** No commits yet. → First commit pushed to github.com/benguy6/grosplit (private).
 - [x] **B21** `.env.example` emptied in the working tree (staged copy is fine).

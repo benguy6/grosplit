@@ -251,10 +251,15 @@ function flowReachable(id) {
 
 // ── screens ────────────────────────────────────────────────────────────────
 
+// GroSplit mark: three torn receipt pieces forming a G. Tile colour is the only variable.
+function logo(tile) {
+  return `<svg role="img" aria-label="GroSplit" viewBox="-56 -56 112 112" width="48" height="48" style="display:block"><rect x="-56" y="-56" width="112" height="112" rx="35" fill="${tile}"/><g fill="var(--card)"><path d="M-26,-18A16,16,0,0,1,-10,-34H-8V31L-11,34L-14,31L-17,34L-20,31L-23,34L-26,31Z"/><path d="M-5,-34H10A16,16,0,0,1,26,-18V-17L22.9,-14L19.8,-17L16.7,-14L13.6,-17L10.5,-14L7.4,-17L4.3,-14L1.2,-17L-1.9,-14L-5,-17L-2.5,-21.25L-5,-25.5L-2.5,-29.75Z"/><path d="M0,-10H26V31L22.9,34L19.8,31L16.7,34L13.6,31L10.5,34L7.4,31L4.3,34L1.2,31L-1.9,34L-5,31L-2.5,26.25L-5,21.5L-2.5,16.75L-5,12H12V4H0Z"/></g><g fill="var(--ink)"><rect x="-22" y="-26" width="9" height="3"/><rect x="-22" y="-20" width="6" height="3"/><rect x="0" y="-29" width="18" height="3"/><rect x="0" y="-24" width="11" height="3"/><rect x="-1" y="19" width="23" height="2"/><rect x="-1" y="22.5" width="23" height="2"/></g></svg>`;
+}
+
 function screenOnboarding() {
   const ms = S.data.members;
   return `<div class="screen" style="padding:78px 22px 40px">
-    <div style="width:48px;height:48px;border-radius:15px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font:700 24px var(--ui)">G</div>
+    ${logo("var(--accent)")}
     <div class="display" style="margin-top:22px;text-wrap:pretty">Who's in the house?</div>
     <div class="body" style="margin-top:8px">Everyone splits everything by default. The Telegram poll is how people get out of things.</div>
 
@@ -1502,7 +1507,7 @@ async function fromHash() {
       const none = e.code === 'no_household';
       app.innerHTML =
         '<div class="screen" style="justify-content:center;padding:40px 28px;gap:10px">' +
-        '<div style="width:48px;height:48px;border-radius:15px;background:var(--ink);display:flex;align-items:center;justify-content:center;color:var(--card);font:700 24px var(--ui);margin-bottom:14px">G</div>' +
+        '<div style="margin-bottom:14px">' + logo('var(--ink)') + '</div>' +
         '<div class="display" style="text-wrap:pretty">' + (none ? 'No group linked yet' : 'You’re not in the group yet') + '</div>' +
         '<div class="body">' + (none
           ? 'GroSplit needs your household’s Telegram group. Add the GroSplit bot to that group, then open the app from there.'
