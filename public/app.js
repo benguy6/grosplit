@@ -31,7 +31,9 @@ const S = {
   outsSeen: '',            // that member's opt-outs when the sheet opened, to spot someone else's edit
   confirmReplace: false,   // poll composer: replacing a poll that already ran
   grocerDraft: null,
-  scanning: false,
+  storeDraft: '',          // New receipt sheet: the typed shop name, so re-renders keep it
+  // Reading is per receipt (see `scans`): true only when the OPEN receipt has a scan in flight.
+  get scanning() { return !!(this.view && scans.has(this.view.receipt.id)); },
   scanError: null,
   toast: null,
   colorFor: null,    // member id whose palette is open
@@ -423,9 +425,12 @@ function screenScan() {
 
     <div style="margin:20px;flex:1;border-radius:22px;background:#2A2622;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center">
       <div style="position:absolute;inset:0;background:repeating-linear-gradient(180deg,#37322D 0 3px,#2E2A25 3px 22px)"></div>
+      ${cam.stream ? '<video id="cam" playsinline muted autoplay style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>' : ''}
+      ${S.scanning && cam.live && scans.get(v.receipt.id) ? `<img src="${esc(scans.get(v.receipt.id))}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">` : ''}
       <div style="position:absolute;left:26px;right:26px;top:44px;bottom:44px;border:2px dashed rgba(255,255,255,.28);border-radius:14px"></div>
       ${S.scanning ? '<div style="position:absolute;left:26px;right:26px;height:3px;background:var(--accent);box-shadow:0 0 22px 5px rgba(232,85,45,.55);animation:gsScan 1.1s cubic-bezier(.4,0,.6,1) infinite alternate"></div>' : ''}
-      <div style="position:relative;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center;padding:0 30px">
+      ${cam.live && !S.scanning && !S.scanError ? '<div style="position:absolute;left:0;right:0;bottom:12px;text-align:center"><span style="display:inline-block;padding:7px 14px;border-radius:999px;background:rgba(0,0,0,.6);font:500 12px var(--mono);letter-spacing:.08em;color:rgba(255,255,255,.9)">FIT THE WHOLE RECEIPT</span></div>' : ''}
+      <div style="position:relative;text-align:center;display:${cam.live && !S.scanning && !S.scanError ? 'none' : 'flex'};flex-direction:column;gap:8px;align-items:center;padding:${cam.live ? '14px 20px;border-radius:14px;background:rgba(0,0,0,.6);margin:0 36px' : '0 30px'}">
         <div style="font:500 12px var(--mono);letter-spacing:.08em;color:rgba(255,255,255,.65)">${S.scanning ? 'READING RECEIPT…' : S.scanError ? "COULDN'T READ THAT" : 'LINE UP THE RECEIPT'}</div>
         <div style="font:400 13px/1.5 var(--ui);color:rgba(255,255,255,.42);text-wrap:pretty">${S.scanning
           ? 'Finding items, prices and tax'
@@ -437,10 +442,13 @@ function screenScan() {
 
     <div style="padding:0 var(--gutter);display:flex;align-items:center;justify-content:space-between">
       <button data-act="go" data-id="manual" style="padding:11px 16px;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;font:500 13px var(--ui)">Enter manually</button>
-      <label style="width:70px;height:70px;border-radius:999px;border:3px solid rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;cursor:pointer">
+      ${cam.live
+        // Live feed: a plain button grabs the frame. No file input here, so the native picker can't also open.
+        ? `<button data-act="snap" aria-label="Take photo" ${S.scanning ? 'disabled' : ''} style="width:70px;height:70px;padding:0;flex:none;border-radius:999px;border:3px solid rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center"><span style="width:56px;height:56px;flex:none;border-radius:999px;background:var(--accent);display:block"></span></button>`
+        : `<label style="width:70px;height:70px;border-radius:999px;border:3px solid rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;cursor:pointer">
         <span style="width:56px;height:56px;border-radius:999px;background:var(--accent);display:block"></span>
         <input type="file" accept="image/*" capture="environment" data-act="shoot" style="display:none" ${S.scanning ? 'disabled' : ''}>
-      </label>
+      </label>`}
       <label style="padding:11px 16px;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;font:500 13px var(--ui);cursor:pointer">
         Upload<input type="file" accept="image/*" data-act="shoot" style="display:none" ${S.scanning ? 'disabled' : ''}>
       </label>
@@ -989,7 +997,7 @@ function newSheet() {
 
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px">
           <div style="font:500 10.5px var(--mono);letter-spacing:.08em;color:var(--ink-40)">WHERE DID YOU SHOP?</div>
-          <input class="field" id="store-draft" placeholder="Store name" autocomplete="off" style="height:52px">
+          <input class="field" id="store-draft" placeholder="Store name" autocomplete="off" value="${esc(S.storeDraft)}" style="height:52px">
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
             ${["Trader Joe's", 'Whole Foods', 'Safeway', 'Costco', 'Kroger', 'Target']
               .map((n) => `<button class="pill" data-act="pick-store" data-name="${esc(n)}" style="background:var(--paper)">${esc(n)}</button>`).join('')}
@@ -1132,10 +1140,14 @@ function render() {
     : '';
   app.innerHTML = body + newSheet() + payerSheet() + outsSheet() + editSheet() + toastHtml;
   animateCounts();
+  syncCamera();
+  bindShoot();
 
   const storeInput = document.getElementById('store-draft');
   if (storeInput) {
     storeInput.focus();
+    const end = storeInput.value.length;
+    storeInput.setSelectionRange(end, end); // focus() alone can leave the caret at the start
     syncStartButton();
   }
 }
@@ -1152,28 +1164,146 @@ function syncStartButton() {
 // ── events ─────────────────────────────────────────────────────────────────
 
 document.addEventListener('input', (e) => {
-  if (e.target.id === 'store-draft') syncStartButton();
+  if (e.target.id === 'store-draft') { S.storeDraft = e.target.value; syncStartButton(); }
 });
 
-document.addEventListener('change', async (e) => {
-  const el = e.target.closest('[data-act="shoot"]');
-  if (!el || !el.files || !el.files[0]) return;
-  const file = el.files[0];
-  S.scanning = true;
+// ── live camera ────────────────────────────────────────────────────────────
+// state: idle (not on the scan screen) | starting | live | failed (stay on the native-camera fallback).
+// render() calls syncCamera() last, so every way of leaving the screen stops the stream.
+// denied: permission refused; sticks for the page session so we never re-prompt.
+const cam = { state: 'idle', stream: null, live: false, visit: 0, denied: false };
+// receipt id -> frozen photo URL (null until the frame is encoded) for every scan in flight.
+const scans = new Map();
+
+function stopCam() {
+  if (cam.stream) cam.stream.getTracks().forEach((t) => t.stop());
+  cam.stream = null; cam.live = false; cam.state = 'idle'; cam.visit++;
+}
+
+function syncCamera() {
+  const want = S.screen === 'scan' && !document.hidden;
+  // A failed camera stays failed while we're still on the scan screen (hide/show must not re-prompt).
+  if (!want) { if (cam.state !== 'idle' && !(cam.state === 'failed' && S.screen === 'scan')) stopCam(); return; }
+  if (cam.state === 'idle') { if (cam.denied) cam.state = 'failed'; else startCam(); }
+  const v = document.getElementById('cam');
+  // The video element is rebuilt on every render; re-attach the same stream.
+  if (v && cam.stream) { v.srcObject = cam.stream; v.play().catch(() => {}); }
+}
+
+async function startCam() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { cam.state = 'failed'; return; }
+  cam.state = 'starting';
+  const visit = ++cam.visit;
+  const gone = () => visit !== cam.visit;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 3840 }, height: { ideal: 2160 } },
+    });
+    if (gone()) { stream.getTracks().forEach((t) => t.stop()); return; } // left while the prompt was open
+    cam.stream = stream;
+    render();
+    // Wait for real frames; a stream that never produces them falls back quietly.
+    for (let i = 0; i < 30 && !gone(); i++) {
+      const v = document.getElementById('cam');
+      if (v && v.videoWidth > 0) { cam.live = true; cam.state = 'live'; render(); return; }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    if (!gone()) { stopCam(); cam.state = 'failed'; render(); }
+  } catch (err) {
+    if (err && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) cam.denied = true;
+    if (!gone()) { stopCam(); cam.state = 'failed'; render(); }
+  }
+}
+
+// Coming back: only re-sync the camera. A full render() would wipe typing in sheets, strand the
+// not-in-group screen (no S.data) and swap the file inputs under an open native picker.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (cam.state !== 'failed') stopCam(); }
+  else if (S.screen === 'scan' && S.data) syncCamera();
+});
+
+function endScan(id) { const u = scans.get(id); if (u) URL.revokeObjectURL(u); scans.delete(id); }
+
+// Where a receipt belongs by status (the `open` handler and a scan that lands on a locked receipt).
+const screenFor = (v) => (v.receipt.status === 'confirmed' ? 'export' : v.receipt.status === 'polling' || v.receipt.status === 'posting' ? 'live' : v.pollCount > 0 ? 'confirm' : 'review');
+
+async function sendImage(file, id) {
+  endScan(id);
+  // Tapped Snap then Back (or moved to another receipt) before the frame was encoded: nothing to send.
+  if (S.screen !== 'scan' || !S.view || S.view.receipt.id !== id) return;
+  const store = S.view.receipt.store;
+  scans.set(id, URL.createObjectURL(file)); // freeze the photo being read over the live feed
   S.scanError = null;
   render();
+  const open = () => S.view && S.view.receipt.id === id;
+  let view;
   try {
-    S.view = await api('POST', '/api/receipt/' + S.view.receipt.id + '/scan', undefined, file);
-    S.scanning = false;
-    await refreshState();
-    go('review');
-    toast('Receipt read — check the lines');
+    view = await api('POST', '/api/receipt/' + id + '/scan', undefined, file);
   } catch (err) {
-    S.scanning = false;
-    S.scanError = err.message;
-    render();
+    endScan(id);
+    if (err.status === 404) { // deleted meanwhile: the user did that, say nothing
+      if (open()) { S.view = null; go('home'); }
+      refreshState().then(render, () => {});
+    } else if (err.status === 409) { // locked / sent to a poll while reading: lines were NOT applied
+      if (open()) {
+        try { S.view = await api('GET', '/api/receipt/' + id); } catch { S.view = null; }
+        go(S.view ? screenFor(S.view) : 'home');
+      }
+      toast(err.message);
+      refreshState().then(render, () => {});
+    } else if (open() && S.screen === 'scan') { S.scanError = err.message; render(); }
+    else toast("Couldn't read the " + store + ' receipt');
+    return;
   }
-});
+  endScan(id);
+  // The scan stands; a failed list refresh is not a failed read.
+  await refreshState().catch(() => {});
+  if (open()) { // wherever the user is, the lines changed under them: they must review
+    S.view = view;
+    if (view.receipt.status === 'review') { go('review'); toast('Receipt read — check the lines'); }
+    else go(screenFor(view));
+  } else if (S.screen === 'home' || S.screen === 'history') render();
+}
+
+// Bound on each input (not on document): if a re-render replaces the input while the native
+// picker is open, the detached input still fires its own change and the photo is still sent.
+function bindShoot() {
+  document.querySelectorAll('[data-act="shoot"]').forEach((inp) => {
+    inp.onchange = () => { if (inp.files && inp.files[0] && S.view && !S.scanning) sendImage(inp.files[0], S.view.receipt.id); };
+  });
+}
+
+// Full sensor frame (videoWidth x videoHeight), not the cover-cropped view.
+async function snapFrame() {
+  let v = document.getElementById('cam');
+  if (!cam.live || S.scanning || !v || !S.view) return;
+  const id = S.view.receipt.id;
+  const fail = () => {
+    endScan(id);
+    if (S.view && S.view.receipt.id === id) { S.scanError = "Couldn't grab that frame"; render(); }
+  };
+  const encode = (el) => {
+    const c = document.createElement('canvas');
+    c.width = el.videoWidth; c.height = el.videoHeight;
+    c.getContext('2d').drawImage(el, 0, 0);
+    c.toBlob((blob) => { if (blob) sendImage(blob, id); else fail(); }, 'image/jpeg', 0.92);
+  };
+  // Lock now: toBlob is async, and a second tap in that gap would send a second scan.
+  const ready = v.videoWidth > 0;
+  if (ready) encode(v); // draw before render() swaps the element
+  scans.set(id, null); S.scanError = null;
+  render();
+  if (ready) return;
+  // Tapped right after a re-render: the fresh <video> has no frames yet. Wait briefly for them.
+  for (let i = 0; i < 10; i++) {
+    v = document.getElementById('cam');
+    if (v && v.videoWidth) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  v = document.getElementById('cam');
+  if (v && v.videoWidth) encode(v); else fail();
+}
 
 document.addEventListener('click', (e) => {
   const stop = e.target.closest('[data-stop]');
@@ -1196,6 +1326,8 @@ document.addEventListener('click', (e) => {
       go(target);
     },
 
+    snap: snapFrame,
+
     flow: () => {
       const target = el.getAttribute('data-id');
       if (!flowReachable(target)) return toast('Finish the split first');
@@ -1204,15 +1336,16 @@ document.addEventListener('click', (e) => {
 
     open: () => act(async () => {
       await loadReceipt(id);
-      const r = S.view.receipt;
-      go(r.status === 'confirmed' ? 'export' : r.status === 'polling' || r.status === 'posting' ? 'live' : S.view.pollCount > 0 ? 'confirm' : 'review');
+      // A scan still reading: show that, not an empty Review that the result would overwrite.
+      go(scans.has(id) ? 'scan' : screenFor(S.view));
     }),
 
-    'new-sheet': () => { S.newSheet = true; S.grocerDraft = meId(); render(); },
+    'new-sheet': () => { S.newSheet = true; S.grocerDraft = meId(); S.storeDraft = ''; render(); },
     'close-new': () => { if (!stop) { S.newSheet = false; render(); } },
     'pick-store': () => {
       const input = document.getElementById('store-draft');
-      if (input) { input.value = el.getAttribute('data-name'); syncStartButton(); }
+      S.storeDraft = el.getAttribute('data-name');
+      if (input) { input.value = S.storeDraft; syncStartButton(); }
     },
     'pick-grocer': () => { S.grocerDraft = id; render(); },
     'start-receipt': () => act(async () => {
@@ -1222,6 +1355,7 @@ document.addEventListener('click', (e) => {
       S.view = await api('POST', '/api/receipt', { store, grocerId: S.grocerDraft || meId() });
       S.selected = [];
       S.newSheet = false;
+      S.storeDraft = '';
       await refreshState();
       go('scan');
     }),
