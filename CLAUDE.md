@@ -42,6 +42,8 @@ your report. Don't make it.
 - Never print, log or copy values from `.env` or `.env.production` (the real bot's token).
   The laptop only ever runs the test bot; the real token belongs on Fly only.
 - Schema changes need an in-place migration (SPEC.md §4).
+- Never kill processes by name (`taskkill /IM chrome.exe`, `Stop-Process -Name node`, ...): that
+  closes the owner's own browser and apps. Kill only PIDs you started, and clean them up yourself.
 - Match the surrounding code style. Short comments that explain *why*.
 - Finish with a report: what changed (file:line), how it was verified, anything left open, and
   **questions for the owner** (the orchestrator relays them; bots can't ask the owner directly).

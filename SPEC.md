@@ -170,7 +170,9 @@ is the visual reference. Non-negotiables:
 - Must fit 360–430px wide with **no horizontal scroll** and nothing clipped.
 - Respect safe areas (`env(safe-area-inset-*)`) and Telegram's own header.
 - Must work with the phone keyboard open (sticky footers can't cover inputs).
-- Native inputs only: real camera via `<input capture>`, real number keypad.
+- Camera: live preview (`getUserMedia`, rear camera) on the scan screen; whenever it is unavailable,
+  refused or fails, fall back to the native camera (`<input capture>`). Stop the stream on leaving the
+  screen. Real number keypad.
 
 **Deliberate deviations from the handoff** (keep these):
 1. Tax is read off the receipt, not a fixed 9%.
@@ -179,6 +181,7 @@ is the visual reference. Non-negotiables:
 4. Items lock while a poll is live.
 5. `--ink-meta` replaces ink-25 for text that carries money (contrast).
 6. No nav rail. Deep-link hashes (`#review/1`) replace it.
+7. Live camera (F8): a dark "FIT THE WHOLE RECEIPT" pill and a dark "READING RECEIPT…" box over the feed (owner approved 2026-10-23).
 
 ## 10. Testing
 
@@ -308,6 +311,26 @@ original review.
 
 ### Owner request 2026-10-21
 - [x] **F7** Logo (owner request 2026-10-21): a cramped G made of three torn receipt pieces with print lines, replacing the plain "G" tile. Orange tile on onboarding, ink tile on the not-in-group screen (the button is that screen's accent). Also `/icon.svg` favicon and a 512px PNG for the bot's profile picture (owner sets it in BotFather).
+- [x] **F8** Live camera on the scan screen (owner request 2026-10-21). The viewfinder shows the real rear-camera feed; the shutter grabs a full-resolution frame and sends it down the same scan path. Falls back to today's native camera if the live feed is unavailable or refused.
+- [x] **B72** (P2, owner-reported) New-receipt sheet: the typed store name lives only in the DOM, so any re-render wipes it (tapping "Who paid?", returning to the app). → Keep the draft in state. Fixed with F8.
+
+### Found by the F7/F8 gates (verdict FAIL; the F8 items are being fixed before deploy)
+- [x] **B73** (P1, money) Live shutter double tap sends two scans; the late one overwrites corrections made in review. → Set `S.scanning` before `toBlob`.
+- [x] **B74** (P1) F8's visibility re-render wipes typing on every screen, strands the not-in-group screen on LOADING, and detaches the file inputs so Upload / the fallback camera can silently drop the photo (likely on Android). → Only re-sync on the scan screen.
+- [x] **B75** (P3) Snap then Back leaves a raw JS error in `scanError`. The frozen photo also shows behind white text on the no-camera fallback. → Guard `sendImage`; photo only when live.
+- [x] **B80** (P0, money, pre-existing; F8 makes it easy to reach) A scan that lands after Lock or Post poll replaces the items of a locked or polling receipt. The scan route checks status before OCR, never after. → Re-check after OCR in the same synchronous block as the write: 409 if not in review, 404 if deleted. The client goes to Review only for a receipt still in review. Fixed with F8.
+- [x] **B81** (P3, F8) A successful scan shows "COULDN'T READ THAT" if the state refresh afterwards fails. A shutter tap right after a re-render is silently ignored. Reopening a receipt mid-scan shows an empty Review with no hint. Fixed with F8.
+- [ ] **B79** (P1, money, backend backstop) Locking can confirm lines the grocer never saw if the items changed after their screen loaded (a late scan, another phone's edit). → `/confirm` takes the `items_version` the screen showed and returns 409 if it moved.
+### Found by the final F8 gate (verdict PASS; follow-up hardening batch)
+- [ ] **B82** (P2, money, pre-existing) Lock during an open poll: `closePoll` sets `review`, then awaits the "Poll closed" message; confirm then sets `confirmed` without re-checking. A second person can post a new poll in that window (wiping opt-outs) or delete the receipt (500). → `UPDATE … SET status='confirmed' WHERE id=? AND status='review'`; 409 if nothing changed; freeze only on success.
+- [ ] **B83** (P2, money) `receipt.id` has no AUTOINCREMENT, so a deleted newest receipt's id is reused. A late scan for the deleted one then passes the B80 re-check and overwrites the new receipt. → Table-rebuild migration like B64.
+- [ ] **B84** (P2/P3, pre-existing) PATCH receipt, items PUT and opt-outs PUT check status, then `await readJson`, then write. A lock or poll between headers and body lets a locked receipt's lines, payer or polled names change. → Read the body first, then re-check and write in one synchronous block.
+- [ ] **B85** (P3, F8) Shutter wait path: app hidden mid-wait encodes a 2×2 black frame and sends it. Back then reopen within 1s sends a frame without a tap. A 409 re-GET can pull the user back from another receipt. → Encode only from the live stream on a visible page with real dimensions, abort if `cam.visit` changed, re-check `open()` after the await.
+- [ ] **B86** (P3, polish) "Upload" pill not dimmed per handoff. House says "Add them to the Telegram group" (handoff: "+ Invite a housemate"). The 409 scan toast is ~108 chars on a 2.2s ✓ toast (see B40). "Enter manually" stays enabled mid-scan, and its lines are wiped when the scan lands (B13).
+- [ ] **D2** (owner decides) One-accent rule vs the handoff's accent checkboxes on Review, the accent flow step on Export, and the logo + CTA on Onboarding.
+- [ ] **B76** (P2, pre-existing) Onboarding: "Start splitting" sits at the bottom edge at 390×844, below the fold in Telegram's shorter viewport.
+- [ ] **B77** (P2, pre-existing) `--ink-40` (~3:1) carries amounts and hints (review sub-lines, tax note, manual hint, "everyone still in"). §9 wants 4.5:1 and `--ink-meta` for money.
+- [ ] **B78** (P3, pre-existing) Review: long names truncate at 360/390, an orphan "EA" wraps, and "SUM OF SHARES" on the Split sits under the sticky footer. Scan: the shutter sits ~25px right of centre (unequal side buttons). New-receipt sheet: top edge looks smooth, not torn (unverified).
 
 ### P3: housekeeping
 - [x] **B20** No commits yet. → First commit pushed to github.com/benguy6/grosplit (private).
