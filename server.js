@@ -8,7 +8,7 @@ const crypto = require('node:crypto');
 const d = require('./db.js');
 const tg = require('./telegram.js');
 const { evenSplitCents } = require('./split.js');
-const { parseReceipt } = require('./ocr.js');
+const ocr = require('./ocr.js'); // module object so tests can stub parseReceipt
 const seed = require('./seed.js');
 const lookup = require('./lookup.js');
 
@@ -368,13 +368,20 @@ async function api(req, res, url, me) {
       const mime = String(req.headers['content-type'] || 'image/jpeg').split(';')[0];
       let parsed;
       try {
-        parsed = await parseReceipt(buf, mime);
+        parsed = await ocr.parseReceipt(buf, mime);
       } catch (e) {
         return fail(res, 502, 'Could not read that receipt: ' + e.message);
       }
       const bad = parsed.items.some((i) => !validCents(i.priceCents)) || !validCents(parsed.taxCents) ||
         (parsed.printedTotalCents != null && !validCents(parsed.printedTotalCents));
       if (bad) return fail(res, 502, 'Could not read that receipt: an amount looked wrong. Try a clearer photo.');
+      // OCR is slow: the receipt may have been deleted, locked or polled meanwhile.
+      // Re-check here; no await below, so nothing can interleave with the writes.
+      const now = d.receipt(db, id);
+      if (!guardHousehold(now, me)) return fail(res, 404, 'no such receipt');
+      if (!editable(now)) {
+        return fail(res, 409, "This receipt was locked or sent to a poll while the photo was being read — the scan wasn't applied.");
+      }
       d.replaceItems(db, id, parsed.items);
       db.prepare('UPDATE receipt SET tax_cents = ?, printed_total_cents = ? WHERE id = ?')
         .run(parsed.taxCents, parsed.printedTotalCents, id);

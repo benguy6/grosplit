@@ -1386,3 +1386,43 @@ test('F5: re-polling still clears ALL opt-outs, hand edits included', async () =
   const again = await api('POST', `/api/receipt/${id}/poll`, { itemIds: [items[0].id] });
   assert.equal(again.body.optOuts.length, 0);
 });
+
+test('a slow scan never overwrites a receipt that was locked, polled or deleted meanwhile', async () => {
+  const ocr = require('./ocr.js');
+  const real = ocr.parseReceipt;
+  const me = (await api('GET', '/api/state')).body.me;
+  const scan = (id) => fetch(base + `/api/receipt/${id}/scan`, {
+    method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: Buffer.from('x'),
+  });
+  // Start a scan on a fresh receipt, run `during` while OCR is pending, then release OCR.
+  const run = async (during) => {
+    const id = (await api('POST', '/api/receipt', { store: 'Slow', grocerId: me.id })).body.receipt.id;
+    await api('PUT', `/api/receipt/${id}/items`, { items: [{ name: 'Milk', priceCents: 300 }], knownIds: [] });
+    let release;
+    ocr.parseReceipt = () => new Promise((r) => { release = () => r({
+      items: [{ name: 'LATE-SCAN', priceCents: 1234 }], taxCents: 0, printedTotalCents: null, store: null }); });
+    const p = scan(id);
+    while (!release) await new Promise((r) => setTimeout(r, 5));
+    await during(id);
+    release();
+    return { id, res: await p };
+  };
+  try {
+    let out = await run((id) => api('POST', `/api/receipt/${id}/confirm`));
+    assert.equal(out.res.status, 409);
+    let v = (await api('GET', `/api/receipt/${out.id}`)).body;
+    assert.deepEqual(v.items.map((i) => i.name), ['Milk']);
+    assert.equal(v.split.subtotalCents, 300);
+
+    out = await run((id) => db.prepare("UPDATE receipt SET status = 'polling' WHERE id = ?").run(id));
+    assert.equal(out.res.status, 409);
+    assert.match((await out.res.json()).error, /scan wasn't applied/);
+    assert.deepEqual(d.items(db, out.id).map((i) => i.name), ['Milk']);
+
+    out = await run((id) => api('DELETE', `/api/receipt/${id}`));
+    assert.equal(out.res.status, 404);
+    assert.equal(d.items(db, out.id).length, 0);
+  } finally {
+    ocr.parseReceipt = real;
+  }
+});
